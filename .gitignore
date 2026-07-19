@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Postman
+.postman/
+postman/
+
+# IntelliJ HTTP requests
+requests.http
