@@ -5,6 +5,8 @@ import gr.barber.booking.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import gr.barber.booking.dto.UserRequestDTO;
 import gr.barber.booking.dto.UserResponseDTO;
+import java.util.List;
+
 
 @Service
 
@@ -37,5 +39,18 @@ public class UserService {
         );
     }
 
+    public List<UserResponseDTO> getAllUsers() {
+
+        return userRepository.findAll()
+                .stream()
+                .map(user -> new UserResponseDTO(
+                        user.getId(),
+                        user.getName(),
+                        user.getEmail(),
+                        user.getPhoneNumber(),
+                        user.getRole()
+                ))
+                .toList();
+    }
 
 }
