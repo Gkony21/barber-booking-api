@@ -4,6 +4,7 @@ import gr.barber.booking.service.UserService;
 import org.springframework.web.bind.annotation.*;
 import gr.barber.booking.dto.UserRequestDTO;
 import gr.barber.booking.dto.UserResponseDTO;
+import java.util.List;
 
 @RestController
 @RequestMapping("/users")
@@ -18,6 +19,11 @@ public class UserController {
     @PostMapping
     public UserResponseDTO createUser(@RequestBody UserRequestDTO request) {
         return userService.saveUser(request);
+    }
+
+    @GetMapping
+    public List<UserResponseDTO> getAllUsers() {
+        return userService.getAllUsers();
     }
 
 }
