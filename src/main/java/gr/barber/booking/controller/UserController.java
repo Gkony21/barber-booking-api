@@ -1,8 +1,9 @@
 package gr.barber.booking.controller;
 
-import gr.barber.booking.model.User;
 import gr.barber.booking.service.UserService;
 import org.springframework.web.bind.annotation.*;
+import gr.barber.booking.dto.UserRequestDTO;
+import gr.barber.booking.dto.UserResponseDTO;
 
 @RestController
 @RequestMapping("/users")
@@ -15,8 +16,8 @@ public class UserController {
     }
 
     @PostMapping
-    public User createUser(@RequestBody User user) {
-        return userService.saveUser(user);
+    public UserResponseDTO createUser(@RequestBody UserRequestDTO request) {
+        return userService.saveUser(request);
     }
 
 }
