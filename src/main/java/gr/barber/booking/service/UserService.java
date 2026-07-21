@@ -53,4 +53,48 @@ public class UserService {
                 .toList();
     }
 
+    public UserResponseDTO getUserById(Long id) {
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return new UserResponseDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhoneNumber(),
+                user.getRole()
+        );
+    }
+
+    public UserResponseDTO updateUser(Long id, UserRequestDTO request) {
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setPassword(request.getPassword());
+        user.setRole(request.getRole());
+
+        User updatedUser = userRepository.save(user);
+
+        return new UserResponseDTO(
+                updatedUser.getId(),
+                updatedUser.getName(),
+                updatedUser.getEmail(),
+                updatedUser.getPhoneNumber(),
+                updatedUser.getRole()
+        );
+    }
+
+    public void deleteUser(Long id) {
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        userRepository.delete(user);
+    }
+
 }
