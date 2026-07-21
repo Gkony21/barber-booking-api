@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import gr.barber.booking.dto.UserRequestDTO;
 import gr.barber.booking.dto.UserResponseDTO;
 import java.util.List;
-
+import gr.barber.booking.exception.UserNotFoundException;
 
 @Service
 
@@ -56,7 +56,7 @@ public class UserService {
     public UserResponseDTO getUserById(Long id) {
 
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         return new UserResponseDTO(
                 user.getId(),
@@ -70,7 +70,7 @@ public class UserService {
     public UserResponseDTO updateUser(Long id, UserRequestDTO request) {
 
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         user.setName(request.getName());
         user.setEmail(request.getEmail());
@@ -92,7 +92,7 @@ public class UserService {
     public void deleteUser(Long id) {
 
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         userRepository.delete(user);
     }
