@@ -7,15 +7,20 @@ import gr.barber.booking.dto.UserRequestDTO;
 import gr.barber.booking.dto.UserResponseDTO;
 import java.util.List;
 import gr.barber.booking.exception.UserNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Service
 
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder) {
+
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public UserResponseDTO saveUser(UserRequestDTO request) {
@@ -24,7 +29,7 @@ public class UserService {
                 request.getName(),
                 request.getEmail(),
                 request.getPhoneNumber(),
-                request.getPassword(),
+                passwordEncoder.encode(request.getPassword()),
                 request.getRole()
         );
 
@@ -96,5 +101,6 @@ public class UserService {
 
         userRepository.delete(user);
     }
+
 
 }
