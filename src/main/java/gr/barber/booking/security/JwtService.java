@@ -32,4 +32,18 @@ public class JwtService {
                 secret.getBytes()
         );
     }
+
+    public String extractEmail(String token) {
+        return Jwts.parser()
+                .verifyWith(getKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
+    }
+
+    public boolean isTokenValid(String token, String email) {
+        return extractEmail(token).equals(email);
+    }
+
 }
