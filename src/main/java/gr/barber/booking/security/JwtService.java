@@ -1,7 +1,6 @@
 package gr.barber.booking.security;
 
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,10 +16,10 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private long expiration;
 
-    public String generateToken(String email) {
-
+    public String generateToken(String email, String role) {
         return Jwts.builder()
                 .subject(email)
+                .claim("role", role)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getKey())
@@ -28,9 +27,7 @@ public class JwtService {
     }
 
     private SecretKey getKey() {
-        return io.jsonwebtoken.security.Keys.hmacShaKeyFor(
-                secret.getBytes()
-        );
+        return io.jsonwebtoken.security.Keys.hmacShaKeyFor(secret.getBytes());
     }
 
     public String extractEmail(String token) {
@@ -42,8 +39,16 @@ public class JwtService {
                 .getSubject();
     }
 
+    public String extractRole(String token) {
+        return Jwts.parser()
+                .verifyWith(getKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("role", String.class);
+    }
+
     public boolean isTokenValid(String token, String email) {
         return extractEmail(token).equals(email);
     }
-
 }
