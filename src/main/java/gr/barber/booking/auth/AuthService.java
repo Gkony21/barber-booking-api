@@ -1,5 +1,6 @@
 package gr.barber.booking.auth;
 
+import gr.barber.booking.model.Role;
 import org.springframework.stereotype.Service;
 import gr.barber.booking.dto.UserRequestDTO;
 import gr.barber.booking.dto.UserResponseDTO;
@@ -32,7 +33,14 @@ public class AuthService {
     }
 
     public UserResponseDTO register(UserRequestDTO request) {
-        return userService.saveUser(request);
+
+        if (request.getRole() != Role.CUSTOMER && request.getRole() != Role.BARBER)
+        {
+            throw new RuntimeException("Invalid role. Allowed roles: CUSTOMER, BARBER");
+        }
+
+
+            return userService.saveUser(request);
     }
 
     public LoginResponseDTO login(LoginRequestDTO request) {

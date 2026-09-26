@@ -80,8 +80,8 @@ public class UserService {
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setPhoneNumber(request.getPhoneNumber());
-        user.setPassword(request.getPassword());
-        user.setRole(request.getRole());
+        user.setPassword(passwordEncoder .encode(request.getPassword()));
+
 
         User updatedUser = userRepository.save(user);
 
