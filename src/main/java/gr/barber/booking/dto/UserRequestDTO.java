@@ -1,13 +1,30 @@
 package gr.barber.booking.dto;
 
 import gr.barber.booking.model.Role;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public class UserRequestDTO {
 
+    @NotBlank
+    @Size(max = 100)
     private String name;
+
+    @NotBlank
+    @Email
+    @Size(max = 255)
     private String email;
+
+    @Size(max = 30)
     private String phoneNumber;
+
+    @NotBlank
+    @Size(min = 8, max = 100)
     private String password;
+
+    @NotNull
     private Role role;
 
     public UserRequestDTO() {
@@ -15,7 +32,7 @@ public class UserRequestDTO {
 
     public UserRequestDTO(String name, String email, String phoneNumber, String password, Role role) {
         this.name = name;
-        this.email = email;
+        setEmail(email);
         this.phoneNumber = phoneNumber;
         this.password = password;
         this.role = role;
@@ -33,8 +50,9 @@ public class UserRequestDTO {
         return email;
     }
 
+    // Trimmed before validation so pasted addresses with stray spaces are accepted.
     public void setEmail(String email) {
-        this.email = email;
+        this.email = email == null ? null : email.trim();
     }
 
     public String getPhoneNumber() {

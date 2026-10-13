@@ -2,10 +2,14 @@ package gr.barber.booking.service;
 
 import gr.barber.booking.model.User;
 import gr.barber.booking.repository.UserRepository;
+import gr.barber.booking.auth.EmailVerificationService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import gr.barber.booking.dto.UserRequestDTO;
 import gr.barber.booking.dto.UserResponseDTO;
 import java.util.List;
+import java.util.Locale;
+import gr.barber.booking.exception.ConflictException;
 import gr.barber.booking.exception.UserNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -15,23 +19,33 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailVerificationService emailVerificationService;
 
     public UserService(UserRepository userRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       EmailVerificationService emailVerificationService) {
 
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.emailVerificationService = emailVerificationService;
     }
 
-    public UserResponseDTO saveUser(UserRequestDTO request) {
+    // Accounts created by an admin are trusted; self-registered ones must verify their email.
+    public UserResponseDTO saveUser(UserRequestDTO request, boolean emailVerified) {
+
+        String email = normalizeEmail(request.getEmail());
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new ConflictException("Email is already registered");
+        }
 
         User user = new User(
                 request.getName(),
-                request.getEmail(),
+                email,
                 request.getPhoneNumber(),
                 passwordEncoder.encode(request.getPassword()),
                 request.getRole()
         );
+        user.setEmailVerified(emailVerified);
 
         User savedUser = userRepository.save(user);
 
@@ -72,13 +86,25 @@ public class UserService {
         );
     }
 
+    @Transactional
     public UserResponseDTO updateUser(Long id, UserRequestDTO request) {
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
+        String email = normalizeEmail(request.getEmail());
+        boolean emailChanged = !email.equals(user.getEmail());
+        if (emailChanged && userRepository.findByEmail(email).isPresent()) {
+            throw new ConflictException("Email is already registered");
+        }
+
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setEmail(email);
+        if (emailChanged) {
+            // The new address has to be confirmed before it can be used to log in.
+            user.setEmailVerified(false);
+            emailVerificationService.sendVerification(user);
+        }
         user.setPhoneNumber(request.getPhoneNumber());
         user.setPassword(passwordEncoder .encode(request.getPassword()));
 
@@ -102,5 +128,7 @@ public class UserService {
         userRepository.delete(user);
     }
 
-
+    public static String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
 }
