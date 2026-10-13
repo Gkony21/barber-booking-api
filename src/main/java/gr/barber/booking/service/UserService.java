@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import gr.barber.booking.dto.UserRequestDTO;
 import gr.barber.booking.dto.UserResponseDTO;
 import java.util.List;
+import java.util.Locale;
+import gr.barber.booking.exception.ConflictException;
 import gr.barber.booking.exception.UserNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -25,9 +27,14 @@ public class UserService {
 
     public UserResponseDTO saveUser(UserRequestDTO request) {
 
+        String email = normalizeEmail(request.getEmail());
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new ConflictException("Email is already registered");
+        }
+
         User user = new User(
                 request.getName(),
-                request.getEmail(),
+                email,
                 request.getPhoneNumber(),
                 passwordEncoder.encode(request.getPassword()),
                 request.getRole()
@@ -77,8 +84,13 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
+        String email = normalizeEmail(request.getEmail());
+        if (!email.equals(user.getEmail()) && userRepository.findByEmail(email).isPresent()) {
+            throw new ConflictException("Email is already registered");
+        }
+
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setEmail(email);
         user.setPhoneNumber(request.getPhoneNumber());
         user.setPassword(passwordEncoder .encode(request.getPassword()));
 
@@ -102,5 +114,7 @@ public class UserService {
         userRepository.delete(user);
     }
 
-
+    public static String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
 }

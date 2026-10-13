@@ -1,5 +1,7 @@
 package gr.barber.booking.auth;
 
+import gr.barber.booking.exception.BadRequestException;
+import gr.barber.booking.exception.UnauthorizedException;
 import gr.barber.booking.model.Role;
 import org.springframework.stereotype.Service;
 import gr.barber.booking.dto.UserRequestDTO;
@@ -11,10 +13,12 @@ import gr.barber.booking.model.User;
 import gr.barber.booking.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import gr.barber.booking.security.JwtService;
-import java.util.Optional;
 
 @Service
 public class AuthService {
+
+    // Same message for unknown email and wrong password, so login cannot be used to discover accounts.
+    private static final String INVALID_CREDENTIALS = "Invalid email or password";
 
     private final UserService userService;
     private final UserRepository userRepository;
@@ -34,25 +38,23 @@ public class AuthService {
 
     public UserResponseDTO register(UserRequestDTO request) {
 
-        if (request.getRole() != Role.CUSTOMER && request.getRole() != Role.BARBER)
-        {
-            throw new RuntimeException("Invalid role. Allowed roles: CUSTOMER, BARBER");
+        if (request.getRole() != Role.CUSTOMER && request.getRole() != Role.BARBER) {
+            throw new BadRequestException("Invalid role. Allowed roles: CUSTOMER, BARBER");
         }
 
-
-            return userService.saveUser(request);
+        return userService.saveUser(request);
     }
 
     public LoginResponseDTO login(LoginRequestDTO request) {
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepository.findByEmail(UserService.normalizeEmail(request.getEmail()))
+                .orElseThrow(() -> new UnauthorizedException(INVALID_CREDENTIALS));
 
         if (!passwordEncoder.matches(
                 request.getPassword(),
                 user.getPassword()
         )) {
-            throw new RuntimeException("Wrong password");
+            throw new UnauthorizedException(INVALID_CREDENTIALS);
         }
 
         String token = jwtService.generateToken(user.getEmail(), user.getRole().name());

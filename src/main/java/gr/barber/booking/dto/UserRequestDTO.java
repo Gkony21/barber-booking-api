@@ -1,13 +1,30 @@
 package gr.barber.booking.dto;
 
 import gr.barber.booking.model.Role;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public class UserRequestDTO {
 
+    @NotBlank
+    @Size(max = 100)
     private String name;
+
+    @NotBlank
+    @Email
+    @Size(max = 255)
     private String email;
+
+    @Size(max = 30)
     private String phoneNumber;
+
+    @NotBlank
+    @Size(min = 8, max = 100)
     private String password;
+
+    @NotNull
     private Role role;
 
     public UserRequestDTO() {
