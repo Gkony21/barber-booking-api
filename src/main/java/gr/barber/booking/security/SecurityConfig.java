@@ -37,6 +37,7 @@ public class SecurityConfig {
                         // Customers can browse barbers and shops without an account.
                         .requestMatchers(HttpMethod.GET, "/barbers/**", "/shops/**").permitAll()
                         .requestMatchers("/shops/**").hasRole("BARBER")
+                        .requestMatchers("/appointments/**").hasRole("CUSTOMER")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(

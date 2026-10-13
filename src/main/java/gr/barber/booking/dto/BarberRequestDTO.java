@@ -13,6 +13,8 @@ public record BarberRequestDTO(
         @Size(max = 255) String address,
         @Size(max = 100) String city,
         @DecimalMin("-90") @DecimalMax("90") Double latitude,
-        @DecimalMin("-180") @DecimalMax("180") Double longitude
+        @DecimalMin("-180") @DecimalMax("180") Double longitude,
+        // Null keeps the current setting (on by default).
+        Boolean autoConfirmBookings
 ) {
 }
