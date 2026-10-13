@@ -13,3 +13,13 @@ spring.jpa.show-sql=true
 
 jwt.secret=${JWT_SECRET}
 jwt.expiration=86400000
+
+# Outgoing email. Defaults point at Mailpit from docker-compose.yml (inbox: http://localhost:8025).
+spring.mail.host=${MAIL_HOST:localhost}
+spring.mail.port=${MAIL_PORT:1025}
+spring.mail.username=${MAIL_USERNAME:}
+spring.mail.password=${MAIL_PASSWORD:}
+app.mail.from=${MAIL_FROM:no-reply@barberbooking.local}
+
+# Base URL of the web app; verification links point to <frontend-url>/verify-email?token=...
+app.frontend-url=${FRONTEND_URL:http://localhost:3000}
