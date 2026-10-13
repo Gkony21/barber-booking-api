@@ -24,11 +24,7 @@ public class EmailService {
 
         String link = frontendUrl + "/verify-email?token=" + token;
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(from);
-        message.setTo(to);
-        message.setSubject("Επιβεβαίωση email - Barber Booking");
-        message.setText("""
+        send(to, "Επιβεβαίωση email - Barber Booking", """
                 Γεια σου %s,
 
                 Για να ενεργοποιήσεις τον λογαριασμό σου, πάτησε τον παρακάτω σύνδεσμο:
@@ -36,7 +32,14 @@ public class EmailService {
 
                 Ο σύνδεσμος λήγει σε 24 ώρες. Αν δεν έκανες εσύ εγγραφή, αγνόησε αυτό το μήνυμα.
                 """.formatted(name, link));
+    }
 
+    public void send(String to, String subject, String text) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(text);
         mailSender.send(message);
     }
 }

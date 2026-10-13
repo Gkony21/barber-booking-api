@@ -16,6 +16,9 @@ import gr.barber.booking.model.User;
 import gr.barber.booking.repository.AppointmentRepository;
 import gr.barber.booking.repository.ServiceOfferingRepository;
 import gr.barber.booking.repository.UserRepository;
+import gr.barber.booking.notification.AppointmentEvent;
+import gr.barber.booking.notification.AppointmentEventType;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +42,7 @@ public class AppointmentService {
     private final AvailabilityService availabilityService;
     private final BookingProperties bookingProperties;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AppointmentService(AppointmentRepository appointmentRepository,
                               ServiceOfferingRepository serviceOfferingRepository,
@@ -46,7 +50,8 @@ public class AppointmentService {
                               BarberService barberService,
                               AvailabilityService availabilityService,
                               BookingProperties bookingProperties,
-                              Clock clock) {
+                              Clock clock,
+                              ApplicationEventPublisher eventPublisher) {
         this.appointmentRepository = appointmentRepository;
         this.serviceOfferingRepository = serviceOfferingRepository;
         this.userRepository = userRepository;
@@ -54,6 +59,7 @@ public class AppointmentService {
         this.availabilityService = availabilityService;
         this.bookingProperties = bookingProperties;
         this.clock = clock;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -114,6 +120,10 @@ public class AppointmentService {
             throw new ConflictException("This time is no longer available");
         }
 
+        publish(status == AppointmentStatus.CONFIRMED
+                ? AppointmentEventType.BOOKED_CONFIRMED
+                : AppointmentEventType.BOOKED_PENDING, appointment);
+
         return AppointmentResponseDTO.from(appointment, zone);
     }
 
@@ -144,6 +154,7 @@ public class AppointmentService {
         }
 
         appointment.cancel(CancelledBy.CUSTOMER);
+        publish(AppointmentEventType.CANCELLED_BY_CUSTOMER, appointment);
         return AppointmentResponseDTO.from(appointment, zone());
     }
 
@@ -173,6 +184,7 @@ public class AppointmentService {
         Appointment appointment = getBarberAppointment(barberEmail, appointmentId);
         requirePendingAndUpcoming(appointment);
         appointment.confirm();
+        publish(AppointmentEventType.CONFIRMED_BY_BARBER, appointment);
         return AppointmentResponseDTO.from(appointment, zone());
     }
 
@@ -181,6 +193,7 @@ public class AppointmentService {
         Appointment appointment = getBarberAppointment(barberEmail, appointmentId);
         requirePendingAndUpcoming(appointment);
         appointment.reject();
+        publish(AppointmentEventType.REJECTED_BY_BARBER, appointment);
         return AppointmentResponseDTO.from(appointment, zone());
     }
 
@@ -189,6 +202,7 @@ public class AppointmentService {
         Appointment appointment = getBarberAppointment(barberEmail, appointmentId);
         requireActiveAndUpcoming(appointment);
         appointment.cancel(CancelledBy.BARBER);
+        publish(AppointmentEventType.CANCELLED_BY_BARBER, appointment);
         return AppointmentResponseDTO.from(appointment, zone());
     }
 
@@ -220,6 +234,10 @@ public class AppointmentService {
         if (!appointment.getStartAt().isAfter(clock.instant())) {
             throw new BadRequestException("Appointment has already started");
         }
+    }
+
+    private void publish(AppointmentEventType type, Appointment appointment) {
+        eventPublisher.publishEvent(AppointmentEvent.of(type, appointment, zone()));
     }
 
     private ZoneId zone() {
