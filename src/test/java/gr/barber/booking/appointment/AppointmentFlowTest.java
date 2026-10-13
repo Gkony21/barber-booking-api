@@ -190,7 +190,7 @@ class AppointmentFlowTest extends IntegrationTest {
         book(barberUser, TUESDAY + "T10:00").andExpect(status().isForbidden());
         book(customer, barber.getId(), 9999L, TUESDAY + "T10:00").andExpect(status().isNotFound());
         mockMvc.perform(post("/appointments").contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isForbidden()); // anonymous
+                .andExpect(status().isUnauthorized()); // anonymous
     }
 
     @Test
