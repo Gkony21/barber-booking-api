@@ -1,5 +1,6 @@
 package gr.barber.booking.security;
 
+import io.jsonwebtoken.JwtException;
 import org.springframework.stereotype.Component;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -39,8 +40,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        String email = jwtService.extractEmail(token);
-        String role = jwtService.extractRole(token);
+        String email;
+        String role;
+        try {
+            email = jwtService.extractEmail(token);
+            role = jwtService.extractRole(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            // Expired or tampered token: continue unauthenticated so public endpoints still work
+            // and protected ones are rejected by Spring Security.
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
