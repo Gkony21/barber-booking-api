@@ -1,9 +1,11 @@
 package gr.barber.booking.auth;
 
 import gr.barber.booking.exception.BadRequestException;
+import gr.barber.booking.exception.EmailNotVerifiedException;
 import gr.barber.booking.exception.UnauthorizedException;
 import gr.barber.booking.model.Role;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import gr.barber.booking.dto.UserRequestDTO;
 import gr.barber.booking.dto.UserResponseDTO;
 import gr.barber.booking.service.UserService;
@@ -24,25 +26,34 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final EmailVerificationService emailVerificationService;
 
     public AuthService(UserService userService,
                        UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       EmailVerificationService emailVerificationService) {
 
         this.userService = userService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.emailVerificationService = emailVerificationService;
     }
 
+    @Transactional
     public UserResponseDTO register(UserRequestDTO request) {
 
         if (request.getRole() != Role.CUSTOMER && request.getRole() != Role.BARBER) {
             throw new BadRequestException("Invalid role. Allowed roles: CUSTOMER, BARBER");
         }
 
-        return userService.saveUser(request);
+        UserResponseDTO response = userService.saveUser(request, false);
+
+        User user = userRepository.getReferenceById(response.getId());
+        emailVerificationService.sendVerification(user);
+
+        return response;
     }
 
     public LoginResponseDTO login(LoginRequestDTO request) {
@@ -55,6 +66,11 @@ public class AuthService {
                 user.getPassword()
         )) {
             throw new UnauthorizedException(INVALID_CREDENTIALS);
+        }
+
+        // Checked after the password so the verification state is only revealed to the account owner.
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException("Please verify your email before logging in");
         }
 
         String token = jwtService.generateToken(user.getEmail(), user.getRole().name());

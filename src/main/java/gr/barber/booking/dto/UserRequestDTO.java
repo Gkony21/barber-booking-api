@@ -32,7 +32,7 @@ public class UserRequestDTO {
 
     public UserRequestDTO(String name, String email, String phoneNumber, String password, Role role) {
         this.name = name;
-        this.email = email;
+        setEmail(email);
         this.phoneNumber = phoneNumber;
         this.password = password;
         this.role = role;
@@ -50,8 +50,9 @@ public class UserRequestDTO {
         return email;
     }
 
+    // Trimmed before validation so pasted addresses with stray spaces are accepted.
     public void setEmail(String email) {
-        this.email = email;
+        this.email = email == null ? null : email.trim();
     }
 
     public String getPhoneNumber() {
