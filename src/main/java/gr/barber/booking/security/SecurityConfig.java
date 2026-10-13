@@ -28,10 +28,15 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/barbers").hasRole("BARBER")
+                        .requestMatchers("/auth/**", "/error").permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/users").hasRole("ADMIN")
-                        .requestMatchers("/auth/**").permitAll()
+                        // Must come before the public GET /barbers/** rule.
+                        .requestMatchers("/barbers/me/**").hasRole("BARBER")
+                        // Customers can browse barbers and shops without an account.
+                        .requestMatchers(HttpMethod.GET, "/barbers/**", "/shops/**").permitAll()
+                        .requestMatchers("/shops/**").hasRole("BARBER")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(

@@ -1,48 +1,39 @@
 package gr.barber.booking.dto;
 
-public class BarberResponseDTO {
+import gr.barber.booking.model.Barber;
+import gr.barber.booking.model.BarberStatus;
+import gr.barber.booking.model.Shop;
 
-    private Long id;
+public record BarberResponseDTO(
+        Long id,
+        String name,
+        String bio,
+        Integer experienceYears,
+        String specialty,
+        String address,
+        String city,
+        Double latitude,
+        Double longitude,
+        BarberStatus status,
+        Long shopId,
+        String shopName
+) {
 
-    private String shopName;
-
-    private String description;
-
-    private Integer experienceYears;
-
-    private String specialty;
-
-
-    public BarberResponseDTO(Long id,
-                             String shopName,
-                             String description,
-                             Integer experienceYears,
-                             String specialty) {
-        this.id = id;
-        this.shopName = shopName;
-        this.description = description;
-        this.experienceYears = experienceYears;
-        this.specialty = specialty;
-    }
-
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getShopName() {
-        return shopName;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public Integer getExperienceYears() {
-        return experienceYears;
-    }
-
-    public String getSpecialty() {
-        return specialty;
+    public static BarberResponseDTO from(Barber barber) {
+        Shop shop = barber.getShop();
+        return new BarberResponseDTO(
+                barber.getId(),
+                barber.getUser().getName(),
+                barber.getBio(),
+                barber.getExperienceYears(),
+                barber.getSpecialty(),
+                barber.getAddress(),
+                barber.getCity(),
+                barber.getLatitude(),
+                barber.getLongitude(),
+                barber.getStatus(),
+                shop != null ? shop.getId() : null,
+                shop != null ? shop.getName() : null
+        );
     }
 }
