@@ -40,3 +40,6 @@ postman/
 requests.http
 src/main/resources/application.properties
 
+
+# Local secrets
+.env

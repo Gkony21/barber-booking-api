@@ -1,4 +1,7 @@
 spring.application.name=barber-booking-api
+
+# Local secrets (DB_USERNAME, DB_PASSWORD, JWT_SECRET, ...) can live in a git-ignored .env file.
+spring.config.import=optional:file:.env[.properties]
 spring.datasource.url=jdbc:postgresql://localhost:5432/barber_booking
 spring.datasource.username=${DB_USERNAME}
 spring.datasource.password=${DB_PASSWORD}
@@ -23,3 +26,9 @@ app.mail.from=${MAIL_FROM:no-reply@barberbooking.local}
 
 # Base URL of the web app; verification links point to <frontend-url>/verify-email?token=...
 app.frontend-url=${FRONTEND_URL:http://localhost:3000}
+
+# API documentation and test console at /swagger-ui.html. Set SWAGGER_ENABLED=false in production.
+springdoc.api-docs.enabled=${SWAGGER_ENABLED:true}
+springdoc.swagger-ui.enabled=${SWAGGER_ENABLED:true}
+springdoc.swagger-ui.operations-sorter=method
+springdoc.swagger-ui.tags-sorter=alpha
