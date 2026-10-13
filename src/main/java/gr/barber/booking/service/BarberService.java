@@ -106,5 +106,8 @@ public class BarberService {
         barber.setCity(request.city());
         barber.setLatitude(request.latitude());
         barber.setLongitude(request.longitude());
+        if (request.autoConfirmBookings() != null) {
+            barber.setAutoConfirmBookings(request.autoConfirmBookings());
+        }
     }
 }

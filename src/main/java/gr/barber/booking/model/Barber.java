@@ -41,6 +41,10 @@ public class Barber {
     @Column(nullable = false)
     private BarberStatus status = BarberStatus.PENDING;
 
+    // When false, new bookings stay PENDING until the barber confirms them.
+    @Column(nullable = false)
+    private boolean autoConfirmBookings = true;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -130,6 +134,14 @@ public class Barber {
 
     public void setStatus(BarberStatus status) {
         this.status = status;
+    }
+
+    public boolean isAutoConfirmBookings() {
+        return autoConfirmBookings;
+    }
+
+    public void setAutoConfirmBookings(boolean autoConfirmBookings) {
+        this.autoConfirmBookings = autoConfirmBookings;
     }
 
     public Instant getCreatedAt() {
