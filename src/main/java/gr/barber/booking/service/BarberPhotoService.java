@@ -68,13 +68,35 @@ public class BarberPhotoService {
     }
 
     @Transactional
-    public PhotoDTO addPhoto(String email, MultipartFile file) {
+    public PhotoDTO addPhoto(String email, MultipartFile file, String caption) {
         Barber barber = barberService.getByEmail(email);
         if (photoRepository.countByBarberId(barber.getId()) >= MAX_PHOTOS) {
             throw new BadRequestException("You can have up to " + MAX_PHOTOS + " photos; delete one first");
         }
         String key = storage.save(imageProcessor.photo(bytes(file), PHOTO_MAX_SIDE));
-        return PhotoDTO.from(photoRepository.save(new BarberPhoto(barber, key)));
+        BarberPhoto photo = new BarberPhoto(barber, key);
+        photo.setCaption(cleanCaption(caption));
+        return PhotoDTO.from(photoRepository.save(photo));
+    }
+
+    @Transactional
+    public PhotoDTO updateCaption(String email, Long photoId, String caption) {
+        Barber barber = barberService.getByEmail(email);
+        BarberPhoto photo = photoRepository.findByIdAndBarberId(photoId, barber.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Photo not found"));
+        photo.setCaption(cleanCaption(caption));
+        return PhotoDTO.from(photo);
+    }
+
+    private static String cleanCaption(String caption) {
+        if (caption == null || caption.isBlank()) {
+            return null;
+        }
+        String trimmed = caption.strip();
+        if (trimmed.length() > 80) {
+            throw new BadRequestException("Captions can be up to 80 characters");
+        }
+        return trimmed;
     }
 
     @Transactional

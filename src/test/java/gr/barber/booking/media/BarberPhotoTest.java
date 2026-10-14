@@ -24,6 +24,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -87,6 +88,36 @@ class BarberPhotoTest extends IntegrationTest {
         mockMvc.perform(delete("/barbers/me/avatar").header("Authorization", bearer(barberUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.avatarUrl").doesNotExist());
+    }
+
+    @Test
+    void photosCanHaveAShortCaption() throws Exception {
+        String body = mockMvc.perform(multipart("/barbers/me/photos")
+                        .file(new MockMultipartFile("file", "a.png", "image/png", png(50, 50)))
+                        .param("caption", "  Skin fade #0 με σχέδιο  ")
+                        .header("Authorization", bearer(barberUser)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.caption").value("Skin fade #0 με σχέδιο"))
+                .andReturn().getResponse().getContentAsString();
+        Integer id = com.jayway.jsonpath.JsonPath.read(body, "$.id");
+
+        mockMvc.perform(patch("/barbers/me/photos/{id}", id)
+                        .header("Authorization", bearer(barberUser))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"caption\":\"Taper\"}"))
+                .andExpect(jsonPath("$.caption").value("Taper"));
+        mockMvc.perform(get("/barbers/{id}/photos", barber.getId())).andExpect(jsonPath("$[0].caption").value("Taper"));
+
+        mockMvc.perform(patch("/barbers/me/photos/{id}", id)
+                        .header("Authorization", bearer(barberUser))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"caption\":\"" + "x".repeat(81) + "\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(patch("/barbers/me/photos/{id}", id)
+                        .header("Authorization", bearer(barberUser))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"caption\":\"\"}"))
+                .andExpect(jsonPath("$.caption").doesNotExist());
     }
 
     @Test

@@ -3,6 +3,7 @@ package gr.barber.booking.service;
 import gr.barber.booking.dto.AdminBarberResponseDTO;
 import gr.barber.booking.dto.BarberRequestDTO;
 import gr.barber.booking.dto.BarberResponseDTO;
+import gr.barber.booking.exception.BadRequestException;
 import gr.barber.booking.exception.ConflictException;
 import gr.barber.booking.exception.ResourceNotFoundException;
 import gr.barber.booking.model.Barber;
@@ -110,6 +111,12 @@ public class BarberService {
         barber.setLongitude(request.longitude());
         if (request.autoConfirmBookings() != null) {
             barber.setAutoConfirmBookings(request.autoConfirmBookings());
+        }
+        if (request.slotStepMinutes() != null) {
+            if (request.slotStepMinutes() != 15 && request.slotStepMinutes() != 30) {
+                throw new BadRequestException("Appointments can start every 15 or 30 minutes");
+            }
+            barber.setSlotStepMinutes(request.slotStepMinutes());
         }
     }
 }

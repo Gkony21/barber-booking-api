@@ -44,6 +44,10 @@ public class Barber {
     // Storage key of the profile photo, or null.
     private String avatarKey;
 
+    // Appointments may start every this many minutes from the start of a shift (15 or 30).
+    @Column(nullable = false)
+    private int slotStepMinutes = 30;
+
     // When false, new bookings stay PENDING until the barber confirms them.
     @Column(nullable = false)
     private boolean autoConfirmBookings = true;
@@ -145,6 +149,14 @@ public class Barber {
 
     public void setAvatarKey(String avatarKey) {
         this.avatarKey = avatarKey;
+    }
+
+    public int getSlotStepMinutes() {
+        return slotStepMinutes;
+    }
+
+    public void setSlotStepMinutes(int slotStepMinutes) {
+        this.slotStepMinutes = slotStepMinutes;
     }
 
     public boolean isAutoConfirmBookings() {

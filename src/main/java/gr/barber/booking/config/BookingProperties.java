@@ -12,13 +12,11 @@ import java.time.ZoneId;
  * @param timeZone            zone of the barbers' working hours; all bookings are interpreted in it
  * @param maxDaysAhead        how many days ahead a customer can book
  * @param cancellationCutoff  how long before a confirmed appointment the customer can still cancel
- * @param slotStepMinutes     spacing of the start times offered to customers
  */
 @ConfigurationProperties("app.booking")
 public record BookingProperties(
         @DefaultValue("Europe/Athens") ZoneId timeZone,
         @DefaultValue("14") int maxDaysAhead,
-        @DefaultValue("2h") Duration cancellationCutoff,
-        @DefaultValue("15") int slotStepMinutes
+        @DefaultValue("2h") Duration cancellationCutoff
 ) {
 }

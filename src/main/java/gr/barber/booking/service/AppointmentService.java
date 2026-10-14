@@ -69,7 +69,7 @@ public class AppointmentService {
         ServiceOffering service = getActiveService(barber, serviceId);
 
         List<String> startTimes = availabilityService
-                .findAvailableStartTimes(barber.getId(), date, service.getDurationMinutes()).stream()
+                .findAvailableStartTimes(barber.getId(), date, service.getDurationMinutes(), barber.getSlotStepMinutes()).stream()
                 .map(TIME_FORMAT::format)
                 .toList();
 
@@ -97,7 +97,7 @@ public class AppointmentService {
                     "Appointments can be booked up to " + bookingProperties.maxDaysAhead() + " days ahead");
         }
         if (!availabilityService.fitsSchedule(barber.getId(), request.startTime().toLocalDate(),
-                request.startTime().toLocalTime(), duration)) {
+                request.startTime().toLocalTime(), duration, barber.getSlotStepMinutes())) {
             throw new BadRequestException("The barber is not working at this time");
         }
         if (!appointmentRepository.findActiveForBarberOverlapping(barber.getId(), startAt, endAt).isEmpty()) {
