@@ -1,5 +1,6 @@
 package gr.barber.booking.dto;
 
+import gr.barber.booking.media.MediaController;
 import gr.barber.booking.model.Barber;
 import gr.barber.booking.model.BarberStatus;
 import gr.barber.booking.model.User;
@@ -11,6 +12,7 @@ public record AdminBarberResponseDTO(
         Long id,
         Long userId,
         String name,
+        String avatarUrl,
         String email,
         String phoneNumber,
         String specialty,
@@ -27,6 +29,7 @@ public record AdminBarberResponseDTO(
                 barber.getId(),
                 user.getId(),
                 user.getName(),
+                MediaController.url(barber.getAvatarKey()),
                 user.getEmail(),
                 user.getPhoneNumber(),
                 barber.getSpecialty(),

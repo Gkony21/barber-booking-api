@@ -41,6 +41,9 @@ public class Barber {
     @Column(nullable = false)
     private BarberStatus status = BarberStatus.PENDING;
 
+    // Storage key of the profile photo, or null.
+    private String avatarKey;
+
     // When false, new bookings stay PENDING until the barber confirms them.
     @Column(nullable = false)
     private boolean autoConfirmBookings = true;
@@ -134,6 +137,14 @@ public class Barber {
 
     public void setStatus(BarberStatus status) {
         this.status = status;
+    }
+
+    public String getAvatarKey() {
+        return avatarKey;
+    }
+
+    public void setAvatarKey(String avatarKey) {
+        this.avatarKey = avatarKey;
     }
 
     public boolean isAutoConfirmBookings() {

@@ -1,5 +1,6 @@
 package gr.barber.booking.dto;
 
+import gr.barber.booking.media.MediaController;
 import gr.barber.booking.model.Barber;
 import gr.barber.booking.model.BarberStatus;
 import gr.barber.booking.model.Shop;
@@ -7,6 +8,7 @@ import gr.barber.booking.model.Shop;
 public record BarberResponseDTO(
         Long id,
         String name,
+        String avatarUrl,
         String bio,
         Integer experienceYears,
         String specialty,
@@ -25,6 +27,7 @@ public record BarberResponseDTO(
         return new BarberResponseDTO(
                 barber.getId(),
                 barber.getUser().getName(),
+                MediaController.url(barber.getAvatarKey()),
                 barber.getBio(),
                 barber.getExperienceYears(),
                 barber.getSpecialty(),
