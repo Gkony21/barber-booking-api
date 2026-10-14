@@ -14,9 +14,14 @@ public class Appointment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "customer_id", nullable = false)
+    // Null for appointments the barber entered for a phone or walk-in customer (see guestName).
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
     private User customer;
+
+    private String guestName;
+
+    private String guestPhone;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "barber_id", nullable = false)
@@ -70,6 +75,28 @@ public class Appointment {
         this.endAt = endAt;
         this.status = status;
         this.customerNote = customerNote;
+    }
+
+    /** An appointment the barber enters for someone without an account (phone call, walk-in). */
+    public static Appointment manual(Barber barber, ServiceOffering service, Instant startAt, Instant endAt,
+                                     String guestName, String guestPhone, String note) {
+        Appointment appointment = new Appointment(null, barber, service, startAt, endAt, AppointmentStatus.CONFIRMED, note);
+        appointment.guestName = guestName;
+        appointment.guestPhone = guestPhone;
+        return appointment;
+    }
+
+    public boolean isManual() {
+        return customer == null;
+    }
+
+    /** Name to show for whoever the appointment is for. */
+    public String getCustomerName() {
+        return customer != null ? customer.getName() : guestName;
+    }
+
+    public String getCustomerPhone() {
+        return customer != null ? customer.getPhoneNumber() : guestPhone;
     }
 
     public void confirm() {

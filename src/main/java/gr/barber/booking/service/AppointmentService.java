@@ -3,6 +3,7 @@ package gr.barber.booking.service;
 import gr.barber.booking.config.BookingProperties;
 import gr.barber.booking.dto.AppointmentRequestDTO;
 import gr.barber.booking.dto.AppointmentResponseDTO;
+import gr.barber.booking.dto.ManualAppointmentRequestDTO;
 import gr.barber.booking.dto.AvailabilityResponseDTO;
 import gr.barber.booking.exception.BadRequestException;
 import gr.barber.booking.exception.ConflictException;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -34,6 +36,7 @@ import java.util.List;
 public class AppointmentService {
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final Duration MANUAL_BOOKING_WINDOW = Duration.ofDays(90);
 
     private final AppointmentRepository appointmentRepository;
     private final ServiceOfferingRepository serviceOfferingRepository;
@@ -125,6 +128,48 @@ public class AppointmentService {
                 : AppointmentEventType.BOOKED_PENDING, appointment);
 
         return AppointmentResponseDTO.from(appointment, zone);
+    }
+
+    /**
+     * The barber's own entry for a phone or walk-in customer. Working hours, days off and the
+     * start-time step are the barber's call here; only overlaps with other appointments are refused.
+     */
+    @Transactional
+    public AppointmentResponseDTO bookManually(String barberEmail, ManualAppointmentRequestDTO request) {
+
+        Barber barber = barberService.getByEmail(barberEmail);
+        ServiceOffering service = serviceOfferingRepository.findByIdAndBarberId(request.serviceId(), barber.getId())
+                .filter(ServiceOffering::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
+
+        ZoneId zone = zone();
+        Instant startAt = request.startTime().atZone(zone).toInstant();
+        Instant endAt = startAt.plusSeconds(service.getDurationMinutes() * 60L);
+        Instant now = clock.instant();
+
+        // A walk-in may be logged just after they sat down, but not long after.
+        if (startAt.isBefore(now.minus(Duration.ofMinutes(30)))) {
+            throw new BadRequestException("The appointment must not be in the past");
+        }
+        if (startAt.isAfter(now.plus(MANUAL_BOOKING_WINDOW))) {
+            throw new BadRequestException("Appointments can be entered up to 90 days ahead");
+        }
+        if (!appointmentRepository.findActiveForBarberOverlapping(barber.getId(), startAt, endAt).isEmpty()) {
+            throw new ConflictException("This time overlaps another appointment");
+        }
+
+        Appointment appointment = Appointment.manual(barber, service, startAt, endAt,
+                request.customerName().strip(), blankToNull(request.customerPhone()), blankToNull(request.note()));
+        try {
+            appointment = appointmentRepository.saveAndFlush(appointment);
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException("This time overlaps another appointment");
+        }
+        return AppointmentResponseDTO.from(appointment, zone);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.strip();
     }
 
     @Transactional(readOnly = true)

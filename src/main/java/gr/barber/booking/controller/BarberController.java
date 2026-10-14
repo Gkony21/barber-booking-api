@@ -30,6 +30,11 @@ public class BarberController {
         return directoryService.list(city, shopId, availableToday);
     }
 
+    @GetMapping("/by-link/{slug}")
+    public BarberResponseDTO getBarberByLink(@PathVariable String slug) {
+        return directoryService.getBySlug(slug);
+    }
+
     @GetMapping("/{id}")
     public BarberResponseDTO getBarber(@PathVariable Long id) {
         return directoryService.get(id);

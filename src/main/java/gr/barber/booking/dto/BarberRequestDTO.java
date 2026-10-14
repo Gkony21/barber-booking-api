@@ -17,6 +17,8 @@ public record BarberRequestDTO(
         // Null keeps the current setting (on by default).
         Boolean autoConfirmBookings,
         // 15 or 30; null keeps the current setting (30 by default).
-        Integer slotStepMinutes
+        Integer slotStepMinutes,
+        // Public link, e.g. "giorgos"; null keeps the current one.
+        @Size(max = 30) String slug
 ) {
 }

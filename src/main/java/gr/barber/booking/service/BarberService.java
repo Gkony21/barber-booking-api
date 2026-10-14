@@ -21,10 +21,12 @@ public class BarberService {
 
     private final BarberRepository barberRepository;
     private final UserRepository userRepository;
+    private final SlugService slugService;
 
-    public BarberService(BarberRepository barberRepository, UserRepository userRepository) {
+    public BarberService(BarberRepository barberRepository, UserRepository userRepository, SlugService slugService) {
         this.barberRepository = barberRepository;
         this.userRepository = userRepository;
+        this.slugService = slugService;
     }
 
     @Transactional
@@ -38,6 +40,7 @@ public class BarberService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Barber barber = new Barber(user);
+        barber.setSlug(slugService.generate(user.getName(), null));
         applyProfile(barber, request);
 
         return BarberResponseDTO.from(barberRepository.save(barber));
@@ -91,6 +94,9 @@ public class BarberService {
         barber.setLongitude(request.longitude());
         if (request.autoConfirmBookings() != null) {
             barber.setAutoConfirmBookings(request.autoConfirmBookings());
+        }
+        if (request.slug() != null && !request.slug().equalsIgnoreCase(barber.getSlug())) {
+            barber.setSlug(slugService.validate(request.slug(), barber.getId()));
         }
         if (request.slotStepMinutes() != null) {
             if (request.slotStepMinutes() != 15 && request.slotStepMinutes() != 30) {

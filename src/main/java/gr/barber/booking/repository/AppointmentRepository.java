@@ -43,6 +43,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     @Query("""
             select a from Appointment a
             where a.status = gr.barber.booking.model.AppointmentStatus.CONFIRMED
+              and a.customer is not null
               and a.startAt > :from and a.startAt <= :to
             """)
     List<Appointment> findConfirmedStartingBetween(Instant from, Instant to);
@@ -57,8 +58,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     int claimSoonReminder(Long id, Instant now);
 
     @Query("""
-            select a from Appointment a
-            where (a.customer.id = :userId or a.barber.user.id = :userId)
+            select a from Appointment a left join a.customer c
+            where (c.id = :userId or a.barber.user.id = :userId)
               and a.status in (gr.barber.booking.model.AppointmentStatus.PENDING,
                                gr.barber.booking.model.AppointmentStatus.CONFIRMED)
               and a.startAt > :now

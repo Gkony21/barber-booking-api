@@ -79,6 +79,13 @@ public class BarberDirectoryService {
     }
 
     @Transactional(readOnly = true)
+    public BarberResponseDTO getBySlug(String slug) {
+        Barber barber = barberRepository.findBySlugAndStatus(slug.toLowerCase(java.util.Locale.ROOT), BarberStatus.APPROVED)
+                .orElseThrow(() -> new gr.barber.booking.exception.ResourceNotFoundException("Barber not found"));
+        return BarberResponseDTO.from(barber, listing(barber));
+    }
+
+    @Transactional(readOnly = true)
     public BarberResponseDTO get(Long id) {
         Barber barber = barberService.getApprovedById(id);
         return BarberResponseDTO.from(barber, listing(barber));
