@@ -48,9 +48,14 @@ public class AuthService {
             throw new BadRequestException("Invalid role. Allowed roles: CUSTOMER, BARBER");
         }
 
+        if (!Boolean.TRUE.equals(request.getAcceptTerms())) {
+            throw new BadRequestException("You need to accept the terms and privacy policy");
+        }
+
         UserResponseDTO response = userService.saveUser(request, false);
 
         User user = userRepository.getReferenceById(response.getId());
+        user.setTermsAcceptedAt(java.time.Instant.now());
         emailVerificationService.sendVerification(user);
 
         return response;

@@ -34,6 +34,9 @@ public class User {
     @Column(nullable = false)
     private boolean emailVerified = false;
 
+    // When the terms and privacy policy were accepted at sign-up; null for accounts created earlier.
+    private java.time.Instant termsAcceptedAt;
+
 
     public User() {
 
@@ -101,5 +104,13 @@ public class User {
 
     public void setEmailVerified(boolean emailVerified) {
         this.emailVerified = emailVerified;
+    }
+
+    public java.time.Instant getTermsAcceptedAt() {
+        return termsAcceptedAt;
+    }
+
+    public void setTermsAcceptedAt(java.time.Instant termsAcceptedAt) {
+        this.termsAcceptedAt = termsAcceptedAt;
     }
 }

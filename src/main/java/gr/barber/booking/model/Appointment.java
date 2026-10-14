@@ -52,6 +52,10 @@ public class Appointment {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
+    private Instant reminderDaySentAt;
+
+    private Instant reminderSoonSentAt;
+
     protected Appointment() {
     }
 
