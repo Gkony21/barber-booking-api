@@ -72,6 +72,9 @@ public class AppointmentEmailListener {
     // Greetings and sentences never contain names: Greek names change form ("Γιώργος" → "Γιώργο")
     // and words around them depend on gender, so names only appear as labelled values.
     private void toCustomer(AppointmentEvent event, String subject, String body) {
+        if (event.customerEmail() == null) {
+            return; // phone or walk-in customer without an account
+        }
         send(event.customerEmail(), subject, "Γεια σου,\n\n" + body);
     }
 

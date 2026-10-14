@@ -41,6 +41,10 @@ public class Barber {
     @Column(nullable = false)
     private BarberStatus status = BarberStatus.PENDING;
 
+    // Short public link, e.g. "giorgos" for /giorgos.
+    @Column(unique = true)
+    private String slug;
+
     // Storage key of the profile photo, or null.
     private String avatarKey;
 
@@ -141,6 +145,14 @@ public class Barber {
 
     public void setStatus(BarberStatus status) {
         this.status = status;
+    }
+
+    public String getSlug() {
+        return slug;
+    }
+
+    public void setSlug(String slug) {
+        this.slug = slug;
     }
 
     public String getAvatarKey() {

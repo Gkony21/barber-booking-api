@@ -75,7 +75,8 @@ public class AccountService {
         }
 
         for (Appointment appointment : appointmentRepository.findUpcomingActiveInvolving(user.getId(), clock.instant())) {
-            boolean asCustomer = Objects.equals(appointment.getCustomer().getId(), user.getId());
+            boolean asCustomer = appointment.getCustomer() != null
+                    && Objects.equals(appointment.getCustomer().getId(), user.getId());
             appointment.cancel(asCustomer ? CancelledBy.CUSTOMER : CancelledBy.BARBER);
             eventPublisher.publishEvent(AppointmentEvent.of(
                     asCustomer ? AppointmentEventType.CANCELLED_BY_CUSTOMER : AppointmentEventType.CANCELLED_BY_BARBER,

@@ -14,6 +14,12 @@ public interface BarberRepository extends JpaRepository<Barber, Long> {
 
     boolean existsByUserEmail(String email);
 
+    Optional<Barber> findBySlug(String slug);
+
+    Optional<Barber> findBySlugAndStatus(String slug, BarberStatus status);
+
+    List<Barber> findAllBySlugIsNull();
+
     Optional<Barber> findByIdAndStatus(Long id, BarberStatus status);
 
     List<Barber> findAllByStatus(BarberStatus status);

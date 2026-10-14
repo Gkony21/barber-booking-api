@@ -10,6 +10,7 @@ import java.time.OffsetDateTime;
 
 public record BarberResponseDTO(
         Long id,
+        String slug,
         String name,
         String avatarUrl,
         String bio,
@@ -44,6 +45,7 @@ public record BarberResponseDTO(
         Shop shop = barber.getShop();
         return new BarberResponseDTO(
                 barber.getId(),
+                barber.getSlug(),
                 barber.getUser().getName(),
                 MediaController.url(barber.getAvatarKey()),
                 barber.getBio(),

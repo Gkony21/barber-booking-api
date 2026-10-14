@@ -25,9 +25,9 @@ public record AppointmentEvent(
     public static AppointmentEvent of(AppointmentEventType type, Appointment appointment, ZoneId zone) {
         return new AppointmentEvent(
                 type,
-                appointment.getCustomer().getEmail(),
-                appointment.getCustomer().getName(),
-                appointment.getCustomer().getPhoneNumber(),
+                appointment.getCustomer() != null ? appointment.getCustomer().getEmail() : null,
+                appointment.getCustomerName(),
+                appointment.getCustomerPhone(),
                 appointment.getBarber().getUser().getEmail(),
                 appointment.getBarber().getUser().getName(),
                 appointment.getServiceName(),

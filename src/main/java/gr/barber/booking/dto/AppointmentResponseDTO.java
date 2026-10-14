@@ -23,6 +23,8 @@ public record AppointmentResponseDTO(
         OffsetDateTime startTime,
         OffsetDateTime endTime,
         AppointmentStatus status,
+        // Entered by the barber for a phone or walk-in customer without an account.
+        boolean manual,
         CancelledBy cancelledBy,
         String note
 ) {
@@ -32,9 +34,9 @@ public record AppointmentResponseDTO(
                 appointment.getId(),
                 appointment.getBarber().getId(),
                 appointment.getBarber().getUser().getName(),
-                appointment.getCustomer().getId(),
-                appointment.getCustomer().getName(),
-                appointment.getCustomer().getPhoneNumber(),
+                appointment.getCustomer() != null ? appointment.getCustomer().getId() : null,
+                appointment.getCustomerName(),
+                appointment.getCustomerPhone(),
                 appointment.getService().getId(),
                 appointment.getServiceName(),
                 Duration.between(appointment.getStartAt(), appointment.getEndAt()).toMinutes(),
@@ -42,6 +44,7 @@ public record AppointmentResponseDTO(
                 appointment.getStartAt().atZone(zone).toOffsetDateTime(),
                 appointment.getEndAt().atZone(zone).toOffsetDateTime(),
                 appointment.getStatus(),
+                appointment.isManual(),
                 appointment.getCancelledBy(),
                 appointment.getCustomerNote()
         );

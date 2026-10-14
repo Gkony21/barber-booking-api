@@ -2,6 +2,7 @@ package gr.barber.booking.controller;
 
 import gr.barber.booking.dto.AppointmentResponseDTO;
 import gr.barber.booking.dto.AvailabilityResponseDTO;
+import gr.barber.booking.dto.ManualAppointmentRequestDTO;
 import gr.barber.booking.dto.TimeOffRequestDTO;
 import gr.barber.booking.dto.TimeOffResponseDTO;
 import gr.barber.booking.service.AppointmentService;
@@ -40,6 +41,13 @@ public class BarberAppointmentController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             Authentication authentication) {
         return appointmentService.getBarberAppointments(authentication.getName(), from, to);
+    }
+
+    @PostMapping("/me/appointments")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AppointmentResponseDTO bookManually(@Valid @RequestBody ManualAppointmentRequestDTO request,
+                                               Authentication authentication) {
+        return appointmentService.bookManually(authentication.getName(), request);
     }
 
     @PostMapping("/me/appointments/{id}/confirm")
