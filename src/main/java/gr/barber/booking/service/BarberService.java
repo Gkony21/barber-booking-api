@@ -55,26 +55,6 @@ public class BarberService {
         return BarberResponseDTO.from(barber);
     }
 
-    @Transactional(readOnly = true)
-    public List<BarberResponseDTO> getApprovedBarbers(String city, Long shopId) {
-
-        List<Barber> barbers;
-        if (shopId != null) {
-            barbers = barberRepository.findAllByStatusAndShopId(BarberStatus.APPROVED, shopId);
-        } else if (city != null && !city.isBlank()) {
-            barbers = barberRepository.findAllByStatusAndCity(BarberStatus.APPROVED, city.trim());
-        } else {
-            barbers = barberRepository.findAllByStatus(BarberStatus.APPROVED);
-        }
-
-        return barbers.stream().map(BarberResponseDTO::from).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public BarberResponseDTO getApprovedBarber(Long id) {
-        return BarberResponseDTO.from(getApprovedById(id));
-    }
-
     // Oldest first, so requests are handled in the order barbers signed up.
     @Transactional(readOnly = true)
     public List<AdminBarberResponseDTO> getBarbersByStatus(BarberStatus status) {

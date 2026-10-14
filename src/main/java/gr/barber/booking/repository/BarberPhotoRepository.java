@@ -12,5 +12,7 @@ public interface BarberPhotoRepository extends JpaRepository<BarberPhoto, Long> 
 
     long countByBarberId(Long barberId);
 
+    Optional<BarberPhoto> findTopByBarberIdOrderByCreatedAtDescIdDesc(Long barberId);
+
     Optional<BarberPhoto> findByIdAndBarberId(Long id, Long barberId);
 }
