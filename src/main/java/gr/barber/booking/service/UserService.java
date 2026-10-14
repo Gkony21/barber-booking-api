@@ -3,6 +3,7 @@ package gr.barber.booking.service;
 import gr.barber.booking.model.User;
 import gr.barber.booking.repository.UserRepository;
 import gr.barber.booking.auth.EmailVerificationService;
+import gr.barber.booking.auth.PasswordPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import gr.barber.booking.dto.UserRequestDTO;
@@ -20,14 +21,17 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
+    private final PasswordPolicy passwordPolicy;
 
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       EmailVerificationService emailVerificationService) {
+                       EmailVerificationService emailVerificationService,
+                       PasswordPolicy passwordPolicy) {
 
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailVerificationService = emailVerificationService;
+        this.passwordPolicy = passwordPolicy;
     }
 
     // Accounts created by an admin are trusted; self-registered ones must verify their email.
@@ -37,6 +41,7 @@ public class UserService {
         if (userRepository.findByEmail(email).isPresent()) {
             throw new ConflictException("Email is already registered");
         }
+        passwordPolicy.check(request.getPassword(), email);
 
         User user = new User(
                 request.getName(),
@@ -106,7 +111,8 @@ public class UserService {
             emailVerificationService.sendVerification(user);
         }
         user.setPhoneNumber(request.getPhoneNumber());
-        user.setPassword(passwordEncoder .encode(request.getPassword()));
+        passwordPolicy.check(request.getPassword(), email);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
 
 
         User updatedUser = userRepository.save(user);

@@ -35,6 +35,20 @@ public class EmailService {
                 """.formatted(link));
     }
 
+    public void sendPasswordResetEmail(String to, String token) {
+
+        String link = frontendUrl + "/reset-password?token=" + token;
+
+        send(to, "Αλλαγή κωδικού - FADE", """
+                Γεια σου,
+
+                Ζητήθηκε αλλαγή κωδικού για τον λογαριασμό σου στο FADE. Για να ορίσεις νέο κωδικό, πάτησε τον σύνδεσμο:
+                %s
+
+                Ο σύνδεσμος ισχύει για 1 ώρα και μόνο μία φορά. Αν δεν το ζήτησες εσύ, αγνόησε αυτό το μήνυμα: ο κωδικός σου δεν αλλάζει.
+                """.formatted(link));
+    }
+
     public void send(String to, String subject, String text) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);

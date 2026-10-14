@@ -38,6 +38,14 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    // The code lets the client explain the problem in the user's language.
+    @ExceptionHandler(WeakPasswordException.class)
+    public ProblemDetail handleWeakPassword(WeakPasswordException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setProperty("code", "WEAK_PASSWORD");
+        return problem;
+    }
+
     @ExceptionHandler(BadRequestException.class)
     public ProblemDetail handleBadRequest(BadRequestException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());

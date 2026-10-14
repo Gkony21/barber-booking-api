@@ -65,8 +65,8 @@ public abstract class IntegrationTest {
     @BeforeEach
     void resetState() {
         jdbcTemplate.execute("""
-                TRUNCATE appointments, time_off, working_hours, service_offerings, shops, barbers,
-                         email_verification_tokens, users RESTART IDENTITY CASCADE
+                TRUNCATE appointments, time_off, working_hours, service_offerings, shops, barber_photos, barbers,
+                         email_verification_tokens, password_reset_tokens, users RESTART IDENTITY CASCADE
                 """);
         clock.set(TestcontainersConfiguration.NOW);
     }
