@@ -18,6 +18,8 @@ public interface BarberRepository extends JpaRepository<Barber, Long> {
 
     List<Barber> findAllByStatus(BarberStatus status);
 
+    List<Barber> findAllByStatusOrderByCreatedAtAsc(BarberStatus status);
+
     List<Barber> findAllByStatusAndShopId(BarberStatus status, Long shopId);
 
     @Query("""

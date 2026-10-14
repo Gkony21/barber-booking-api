@@ -1,6 +1,6 @@
 package gr.barber.booking.controller;
 
-import gr.barber.booking.dto.BarberResponseDTO;
+import gr.barber.booking.dto.AdminBarberResponseDTO;
 import gr.barber.booking.dto.BarberStatusUpdateDTO;
 import gr.barber.booking.model.BarberStatus;
 import gr.barber.booking.service.BarberService;
@@ -20,12 +20,12 @@ public class AdminBarberController {
     }
 
     @GetMapping
-    public List<BarberResponseDTO> getBarbers(@RequestParam(defaultValue = "PENDING") BarberStatus status) {
+    public List<AdminBarberResponseDTO> getBarbers(@RequestParam(defaultValue = "PENDING") BarberStatus status) {
         return barberService.getBarbersByStatus(status);
     }
 
     @PatchMapping("/{id}/status")
-    public BarberResponseDTO updateStatus(@PathVariable Long id,
+    public AdminBarberResponseDTO updateStatus(@PathVariable Long id,
                                           @Valid @RequestBody BarberStatusUpdateDTO request) {
         return barberService.updateStatus(id, request.status());
     }
