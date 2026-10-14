@@ -2,6 +2,7 @@ package gr.barber.booking.controller;
 
 import gr.barber.booking.dto.BarberRequestDTO;
 import gr.barber.booking.dto.BarberResponseDTO;
+import gr.barber.booking.service.BarberDirectoryService;
 import gr.barber.booking.service.BarberService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -15,20 +16,23 @@ import java.util.List;
 public class BarberController {
 
     private final BarberService barberService;
+    private final BarberDirectoryService directoryService;
 
-    public BarberController(BarberService barberService) {
+    public BarberController(BarberService barberService, BarberDirectoryService directoryService) {
         this.barberService = barberService;
+        this.directoryService = directoryService;
     }
 
     @GetMapping
     public List<BarberResponseDTO> getBarbers(@RequestParam(required = false) String city,
-                                              @RequestParam(required = false) Long shopId) {
-        return barberService.getApprovedBarbers(city, shopId);
+                                              @RequestParam(required = false) Long shopId,
+                                              @RequestParam(defaultValue = "false") boolean availableToday) {
+        return directoryService.list(city, shopId, availableToday);
     }
 
     @GetMapping("/{id}")
     public BarberResponseDTO getBarber(@PathVariable Long id) {
-        return barberService.getApprovedBarber(id);
+        return directoryService.get(id);
     }
 
     @PostMapping("/me")
