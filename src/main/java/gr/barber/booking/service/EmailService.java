@@ -20,18 +20,19 @@ public class EmailService {
         this.frontendUrl = frontendUrl;
     }
 
-    public void sendVerificationEmail(String to, String name, String token) {
+    public void sendVerificationEmail(String to, String token) {
 
         String link = frontendUrl + "/verify-email?token=" + token;
 
-        send(to, "Επιβεβαίωση email - Barber Booking", """
-                Γεια σου %s,
+        // No name in the greeting: Greek names change form when addressed ("Γιώργος" → "Γιώργο").
+        send(to, "Επιβεβαίωσε το email σου - FADE", """
+                Γεια σου,
 
-                Για να ενεργοποιήσεις τον λογαριασμό σου, πάτησε τον παρακάτω σύνδεσμο:
+                Για να ενεργοποιήσεις τον λογαριασμό σου στο FADE, πάτησε τον παρακάτω σύνδεσμο:
                 %s
 
-                Ο σύνδεσμος λήγει σε 24 ώρες. Αν δεν έκανες εσύ εγγραφή, αγνόησε αυτό το μήνυμα.
-                """.formatted(name, link));
+                Ο σύνδεσμος ισχύει για 24 ώρες. Αν δεν έκανες εσύ εγγραφή, αγνόησε αυτό το μήνυμα.
+                """.formatted(link));
     }
 
     public void send(String to, String subject, String text) {

@@ -55,6 +55,8 @@ class AppointmentEmailTest extends IntegrationTest {
         assertThat(toCustomer.getSubject()).isEqualTo("Το ραντεβού σου επιβεβαιώθηκε");
         assertThat(toCustomer.getText())
                 .contains("Haircut", "Τρίτη 8 Ιανουαρίου 2030, 10:00", "12,00 €", "πληρωμή στο κατάστημα");
+        // Names only appear as labelled values, never inside sentences or greetings.
+        assertThat(toCustomer.getText()).startsWith("Γεια σου,").contains("Barber: Nikos").doesNotContain("Ο/Η", "τον/την");
 
         SimpleMailMessage toBarber = mailTo(mails, "nikos@test.gr");
         assertThat(toBarber.getSubject()).isEqualTo("Νέο ραντεβού: Τρίτη 8 Ιανουαρίου 2030, 10:00");

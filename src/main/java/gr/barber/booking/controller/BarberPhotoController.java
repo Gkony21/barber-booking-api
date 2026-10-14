@@ -1,7 +1,9 @@
 package gr.barber.booking.controller;
 
 import gr.barber.booking.dto.BarberResponseDTO;
+import gr.barber.booking.dto.PhotoCaptionDTO;
 import gr.barber.booking.dto.PhotoDTO;
+import jakarta.validation.Valid;
 import gr.barber.booking.service.BarberPhotoService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -33,8 +35,17 @@ public class BarberPhotoController {
 
     @PostMapping(value = "/me/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public PhotoDTO addPhoto(@RequestParam("file") MultipartFile file, Authentication authentication) {
-        return photoService.addPhoto(authentication.getName(), file);
+    public PhotoDTO addPhoto(@RequestParam("file") MultipartFile file,
+                             @RequestParam(value = "caption", required = false) String caption,
+                             Authentication authentication) {
+        return photoService.addPhoto(authentication.getName(), file, caption);
+    }
+
+    @PatchMapping("/me/photos/{photoId}")
+    public PhotoDTO updateCaption(@PathVariable Long photoId,
+                                  @Valid @RequestBody PhotoCaptionDTO request,
+                                  Authentication authentication) {
+        return photoService.updateCaption(authentication.getName(), photoId, request.caption());
     }
 
     @DeleteMapping("/me/photos/{photoId}")

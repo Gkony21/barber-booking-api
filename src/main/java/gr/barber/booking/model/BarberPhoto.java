@@ -20,6 +20,8 @@ public class BarberPhoto {
     @Column(nullable = false, unique = true)
     private String imageKey;
 
+    private String caption;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -42,6 +44,14 @@ public class BarberPhoto {
 
     public String getImageKey() {
         return imageKey;
+    }
+
+    public String getCaption() {
+        return caption;
+    }
+
+    public void setCaption(String caption) {
+        this.caption = caption;
     }
 
     public Instant getCreatedAt() {

@@ -40,33 +40,34 @@ public class AppointmentEmailListener {
         switch (event.type()) {
             case BOOKED_CONFIRMED -> {
                 toCustomer(event, "Το ραντεβού σου επιβεβαιώθηκε",
-                        "Το ραντεβού σου με τον/την " + event.barberName() + " επιβεβαιώθηκε.\n\n" + details);
+                        "Το ραντεβού σου κλείστηκε. Τα στοιχεία:\n\n" + details);
                 toBarber(event, "Νέο ραντεβού: " + when(event),
-                        event.customerName() + " έκλεισε ραντεβού.\n\n" + details);
+                        "Έκλεισε νέο ραντεβού στο πρόγραμμά σου.\n\n" + details);
             }
             case BOOKED_PENDING -> {
                 toCustomer(event, "Το αίτημά σου στάλθηκε",
-                        "Το αίτημά σου για ραντεβού με τον/την " + event.barberName()
-                                + " στάλθηκε και περιμένει επιβεβαίωση. Θα σε ενημερώσουμε με email.\n\n" + details);
+                        "Το αίτημά σου για ραντεβού στάλθηκε και περιμένει επιβεβαίωση. "
+                                + "Θα σου στείλουμε email μόλις απαντηθεί.\n\n" + details);
                 toBarber(event, "Νέο αίτημα ραντεβού: " + when(event),
-                        event.customerName() + " ζητάει ραντεβού. Επιβεβαίωσέ το ή απόρριψέ το από την εφαρμογή.\n\n"
+                        "Υπάρχει νέο αίτημα για ραντεβού. Αποδέξου το ή απόρριψέ το από το Πρόγραμμα στην εφαρμογή.\n\n"
                                 + details);
             }
             case CONFIRMED_BY_BARBER -> toCustomer(event, "Το ραντεβού σου επιβεβαιώθηκε",
-                    "Ο/Η " + event.barberName() + " επιβεβαίωσε το ραντεβού σου.\n\n" + details);
+                    "Το αίτημά σου έγινε δεκτό και το ραντεβού είναι κλεισμένο.\n\n" + details);
             case REJECTED_BY_BARBER -> toCustomer(event, "Το αίτημά σου δεν έγινε δεκτό",
-                    "Ο/Η " + event.barberName() + " δεν μπορεί να σε εξυπηρετήσει αυτή την ώρα. "
-                            + "Μπορείς να διαλέξεις άλλη ώρα από την εφαρμογή.\n\n" + details);
+                    "Η ώρα που ζήτησες δεν είναι διαθέσιμη. Μπορείς να διαλέξεις άλλη ώρα από την εφαρμογή.\n\n"
+                            + details);
             case CANCELLED_BY_CUSTOMER -> toBarber(event, "Ακύρωση ραντεβού: " + when(event),
-                    event.customerName() + " ακύρωσε το ραντεβού. Η ώρα είναι ξανά διαθέσιμη.\n\n" + details);
+                    "Ένα ραντεβού ακυρώθηκε και η ώρα είναι ξανά ελεύθερη.\n\n" + details);
             case CANCELLED_BY_BARBER -> toCustomer(event, "Το ραντεβού σου ακυρώθηκε",
-                    "Ο/Η " + event.barberName() + " ακύρωσε το ραντεβού σου. "
-                            + "Μπορείς να κλείσεις νέο ραντεβού από την εφαρμογή.\n\n" + details);
+                    "Το ραντεβού σου ακυρώθηκε. Μπορείς να κλείσεις νέο ραντεβού από την εφαρμογή.\n\n" + details);
         }
     }
 
+    // Greetings and sentences never contain names: Greek names change form ("Γιώργος" → "Γιώργο")
+    // and words around them depend on gender, so names only appear as labelled values.
     private void toCustomer(AppointmentEvent event, String subject, String body) {
-        send(event.customerEmail(), subject, "Γεια σου " + event.customerName() + ",\n\n" + body);
+        send(event.customerEmail(), subject, "Γεια σου,\n\n" + body);
     }
 
     // Barbers also get the customer's phone, in case they need to reach them.
@@ -74,7 +75,7 @@ public class AppointmentEmailListener {
         String phone = event.customerPhone() != null && !event.customerPhone().isBlank()
                 ? "\nΤηλέφωνο πελάτη: " + event.customerPhone()
                 : "";
-        send(event.barberEmail(), subject, "Γεια σου " + event.barberName() + ",\n\n" + body + phone);
+        send(event.barberEmail(), subject, "Γεια σου,\n\n" + body + phone);
     }
 
     private void send(String to, String subject, String body) {
@@ -88,7 +89,7 @@ public class AppointmentEmailListener {
     private static String details(AppointmentEvent event) {
         return "Υπηρεσία: " + event.serviceName() + "\n"
                 + "Πότε: " + when(event) + "\n"
-                + "Κουρέας: " + event.barberName() + "\n"
+                + "Barber: " + event.barberName() + "\n"
                 + "Πελάτης: " + event.customerName() + "\n"
                 + "Τιμή: " + String.format(GREEK, "%.2f €", event.price()) + " (πληρωμή στο κατάστημα)";
     }

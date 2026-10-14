@@ -23,7 +23,7 @@ public class VerificationEmailListener {
     @TransactionalEventListener
     public void onVerificationEmailRequested(VerificationEmailRequested event) {
         try {
-            emailService.sendVerificationEmail(event.email(), event.name(), event.token());
+            emailService.sendVerificationEmail(event.email(), event.token());
         } catch (MailException e) {
             log.error("Could not send verification email to {}", event.email(), e);
         }

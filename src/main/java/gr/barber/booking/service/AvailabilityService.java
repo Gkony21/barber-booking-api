@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -44,7 +45,7 @@ public class AvailabilityService {
     }
 
     @Transactional(readOnly = true)
-    public List<LocalTime> findAvailableStartTimes(Long barberId, LocalDate date, int durationMinutes) {
+    public List<LocalTime> findAvailableStartTimes(Long barberId, LocalDate date, int durationMinutes, int stepMinutes) {
 
         if (!isWithinBookingWindow(date) || timeOffRepository.isOff(barberId, date)) {
             return List.of();
@@ -70,7 +71,7 @@ public class AvailabilityService {
                     available.add(start);
                 }
 
-                LocalTime next = start.plusMinutes(bookingProperties.slotStepMinutes());
+                LocalTime next = start.plusMinutes(stepMinutes);
                 if (!next.isAfter(start)) {
                     break; // wrapped past midnight
                 }
@@ -86,7 +87,7 @@ public class AvailabilityService {
      * (and the database enforces) separately.
      */
     @Transactional(readOnly = true)
-    public boolean fitsSchedule(Long barberId, LocalDate date, LocalTime start, int durationMinutes) {
+    public boolean fitsSchedule(Long barberId, LocalDate date, LocalTime start, int durationMinutes, int stepMinutes) {
 
         if (!isWithinBookingWindow(date) || timeOffRepository.isOff(barberId, date)) {
             return false;
@@ -97,8 +98,11 @@ public class AvailabilityService {
             return false; // would run past midnight
         }
 
+        // Starts must fall on the barber's step from the shift start, as offered to customers.
         return shiftsOn(barberId, date).stream()
-                .anyMatch(shift -> !start.isBefore(shift.getStartTime()) && !end.isAfter(shift.getEndTime()));
+                .anyMatch(shift -> !start.isBefore(shift.getStartTime())
+                        && !end.isAfter(shift.getEndTime())
+                        && Duration.between(shift.getStartTime(), start).toMinutes() % stepMinutes == 0);
     }
 
     public boolean isWithinBookingWindow(LocalDate date) {

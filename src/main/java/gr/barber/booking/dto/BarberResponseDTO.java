@@ -18,6 +18,7 @@ public record BarberResponseDTO(
         Double longitude,
         BarberStatus status,
         boolean autoConfirmBookings,
+        int slotStepMinutes,
         Long shopId,
         String shopName
 ) {
@@ -37,6 +38,7 @@ public record BarberResponseDTO(
                 barber.getLongitude(),
                 barber.getStatus(),
                 barber.isAutoConfirmBookings(),
+                barber.getSlotStepMinutes(),
                 shop != null ? shop.getId() : null,
                 shop != null ? shop.getName() : null
         );

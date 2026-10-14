@@ -56,6 +56,9 @@ class AppointmentFlowTest extends IntegrationTest {
         otherCustomer = createUser("Eleni", "eleni@test.gr", Role.CUSTOMER);
         barberUser = createUser("Nikos", "nikos@test.gr", Role.BARBER);
         barber = createApprovedBarber(barberUser, true);
+        // These scenarios use quarter-hour starts; the 30-minute default is covered in SlotStepTest.
+        barber.setSlotStepMinutes(15);
+        barberRepository.save(barber);
         haircut = createService(barber, "Haircut", 30, "12.00");
         addShift(barber, DayOfWeek.MONDAY, "10:00", "14:00");
         addShift(barber, DayOfWeek.MONDAY, "17:00", "21:00");
@@ -169,6 +172,8 @@ class AppointmentFlowTest extends IntegrationTest {
     void customerCannotHoldTwoAppointmentsAtTheSameTime() throws Exception {
         User secondBarberUser = createUser("Kostas", "kostas@test.gr", Role.BARBER);
         Barber secondBarber = createApprovedBarber(secondBarberUser, true);
+        secondBarber.setSlotStepMinutes(15);
+        barberRepository.save(secondBarber);
         ServiceOffering beard = createService(secondBarber, "Beard", 30, "8.00");
         addShift(secondBarber, DayOfWeek.TUESDAY, "10:00", "14:00");
 

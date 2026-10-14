@@ -15,6 +15,8 @@ public record BarberRequestDTO(
         @DecimalMin("-90") @DecimalMax("90") Double latitude,
         @DecimalMin("-180") @DecimalMax("180") Double longitude,
         // Null keeps the current setting (on by default).
-        Boolean autoConfirmBookings
+        Boolean autoConfirmBookings,
+        // 15 or 30; null keeps the current setting (30 by default).
+        Integer slotStepMinutes
 ) {
 }
