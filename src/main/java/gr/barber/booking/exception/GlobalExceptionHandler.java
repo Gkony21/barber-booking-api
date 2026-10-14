@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,6 +41,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadRequestException.class)
     public ProblemDetail handleBadRequest(BadRequestException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ProblemDetail handleTooLarge(MaxUploadSizeExceededException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "The file is too large (max 10 MB)");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
