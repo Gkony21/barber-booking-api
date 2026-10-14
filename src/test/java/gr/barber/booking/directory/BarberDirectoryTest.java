@@ -33,6 +33,7 @@ class BarberDirectoryTest extends IntegrationTest {
         tonight = createApprovedBarber(createUser("Nikos", "nikos@test.gr", Role.BARBER), true);
         createService(tonight, "Haircut", 30, "12.00");
         createService(tonight, "Beard", 20, "8.00");
+        createService(tonight, "Wash", 10, "0.00"); // free extras do not set the starting price
         addShift(tonight, DayOfWeek.MONDAY, "17:00", "21:00");
         photoRepository.save(new BarberPhoto(tonight, "11111111-1111-1111-1111-111111111111.jpg"));
         photoRepository.save(new BarberPhoto(tonight, "22222222-2222-2222-2222-222222222222.jpg"));

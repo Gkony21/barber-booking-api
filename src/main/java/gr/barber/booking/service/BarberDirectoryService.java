@@ -86,7 +86,10 @@ public class BarberDirectoryService {
 
     private BarberResponseDTO.Listing listing(Barber barber) {
         List<ServiceOffering> services = serviceRepository.findAllByBarberIdAndActiveTrueOrderByName(barber.getId());
-        BigDecimal fromPrice = services.stream().map(ServiceOffering::getPrice).min(Comparator.naturalOrder()).orElse(null);
+        // Free extras (e.g. a 0 € wash) would make every barber read "από 0 €".
+        BigDecimal fromPrice = services.stream().map(ServiceOffering::getPrice)
+                .filter(price -> price.signum() > 0)
+                .min(Comparator.naturalOrder()).orElse(null);
         String coverKey = photoRepository.findTopByBarberIdOrderByCreatedAtDescIdDesc(barber.getId())
                 .map(photo -> photo.getImageKey())
                 .orElse(null);
