@@ -1,5 +1,6 @@
 package gr.barber.booking.service;
 
+import gr.barber.booking.dto.AdminBarberResponseDTO;
 import gr.barber.booking.dto.BarberRequestDTO;
 import gr.barber.booking.dto.BarberResponseDTO;
 import gr.barber.booking.exception.ConflictException;
@@ -73,19 +74,20 @@ public class BarberService {
         return BarberResponseDTO.from(getApprovedById(id));
     }
 
+    // Oldest first, so requests are handled in the order barbers signed up.
     @Transactional(readOnly = true)
-    public List<BarberResponseDTO> getBarbersByStatus(BarberStatus status) {
-        return barberRepository.findAllByStatus(status).stream()
-                .map(BarberResponseDTO::from)
+    public List<AdminBarberResponseDTO> getBarbersByStatus(BarberStatus status) {
+        return barberRepository.findAllByStatusOrderByCreatedAtAsc(status).stream()
+                .map(AdminBarberResponseDTO::from)
                 .toList();
     }
 
     @Transactional
-    public BarberResponseDTO updateStatus(Long id, BarberStatus status) {
+    public AdminBarberResponseDTO updateStatus(Long id, BarberStatus status) {
         Barber barber = barberRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Barber not found"));
         barber.setStatus(status);
-        return BarberResponseDTO.from(barber);
+        return AdminBarberResponseDTO.from(barber);
     }
 
     public Barber getByEmail(String email) {
