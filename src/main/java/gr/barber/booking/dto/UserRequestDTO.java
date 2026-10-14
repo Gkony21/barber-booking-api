@@ -27,6 +27,9 @@ public class UserRequestDTO {
     @NotNull
     private Role role;
 
+    // Required (true) at self-registration; ignored elsewhere.
+    private Boolean acceptTerms;
+
     public UserRequestDTO() {
     }
 
@@ -77,5 +80,13 @@ public class UserRequestDTO {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public Boolean getAcceptTerms() {
+        return acceptTerms;
+    }
+
+    public void setAcceptTerms(Boolean acceptTerms) {
+        this.acceptTerms = acceptTerms;
     }
 }

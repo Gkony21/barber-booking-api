@@ -43,3 +43,7 @@ app.admin-emails=${ADMIN_EMAILS:}
 spring.servlet.multipart.max-file-size=10MB
 spring.servlet.multipart.max-request-size=10MB
 app.storage.local-dir=${STORAGE_DIR:uploads}
+
+# Behind a hosting proxy (e.g. Render) set FORWARD_HEADERS_STRATEGY=framework so the real client IP
+# is used for rate limiting. Leave "none" when the app is reached directly (headers could be faked).
+server.forward-headers-strategy=${FORWARD_HEADERS_STRATEGY:none}

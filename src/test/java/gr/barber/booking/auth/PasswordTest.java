@@ -99,7 +99,7 @@ class PasswordTest extends IntegrationTest {
 
     private ResultActions register(String email, String password) throws Exception {
         return mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
-                {"name":"New","email":"%s","password":"%s","role":"CUSTOMER"}""".formatted(email, password)));
+                {"name":"New","email":"%s","password":"%s","role":"CUSTOMER","acceptTerms":true}""".formatted(email, password)));
     }
 
     private ResultActions forgot(String email) throws Exception {

@@ -1,6 +1,8 @@
 package gr.barber.booking.security;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -29,7 +31,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                   ObjectProvider<RateLimitFilter> rateLimitFilter) throws Exception {
+
+        rateLimitFilter.ifAvailable(filter -> http.addFilterAfter(filter, CorsFilter.class));
 
         http
                 .csrf(csrf -> csrf.disable())

@@ -40,6 +40,16 @@ class RegistrationFlowTest extends IntegrationTest {
     }
 
     @Test
+    void signUpRequiresAcceptingTheTerms() throws Exception {
+        mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"name":"Maria","email":"maria@test.gr","password":"pass1234","role":"CUSTOMER"}"""))
+                .andExpect(status().isBadRequest());
+
+        register("maria@test.gr", "CUSTOMER").andExpect(status().isOk());
+        assertThat(userRepository.findByEmail("maria@test.gr").orElseThrow().getTermsAcceptedAt()).isNotNull();
+    }
+
+    @Test
     void loginDoesNotRevealWhetherAnEmailIsRegistered() throws Exception {
         register("maria@test.gr", "CUSTOMER");
 
@@ -59,7 +69,7 @@ class RegistrationFlowTest extends IntegrationTest {
         register("MARIA@test.gr", "CUSTOMER").andExpect(status().isConflict());
 
         mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
-                        {"name":"A","email":"a@test.gr","password":"short","role":"CUSTOMER"}"""))
+                        {"name":"A","email":"a@test.gr","password":"short","role":"CUSTOMER","acceptTerms":true}"""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.password").exists());
     }
@@ -77,7 +87,7 @@ class RegistrationFlowTest extends IntegrationTest {
 
     private ResultActions register(String email, String role) throws Exception {
         return mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
-                {"name":"Maria","email":"%s","password":"pass1234","role":"%s"}""".formatted(email, role)));
+                {"name":"Maria","email":"%s","password":"pass1234","role":"%s","acceptTerms":true}""".formatted(email, role)));
     }
 
     private ResultActions login(String email, String password) throws Exception {

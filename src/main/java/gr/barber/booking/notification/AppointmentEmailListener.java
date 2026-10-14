@@ -61,6 +61,11 @@ public class AppointmentEmailListener {
                     "Ένα ραντεβού ακυρώθηκε και η ώρα είναι ξανά ελεύθερη.\n\n" + details);
             case CANCELLED_BY_BARBER -> toCustomer(event, "Το ραντεβού σου ακυρώθηκε",
                     "Το ραντεβού σου ακυρώθηκε. Μπορείς να κλείσεις νέο ραντεβού από την εφαρμογή.\n\n" + details);
+            case REMINDER_DAY -> toCustomer(event, "Υπενθύμιση ραντεβού: " + when(event),
+                    "Το ραντεβού σου πλησιάζει. Αν δεν μπορείς να έρθεις, ακύρωσέ το από την εφαρμογή "
+                            + "έως 2 ώρες πριν, ώστε να μπορεί να κλείσει την ώρα κάποιος άλλος.\n\n" + details);
+            case REMINDER_SOON -> toCustomer(event, "Σε λίγο: ραντεβού στις " + event.startTime().toLocalTime(),
+                    "Το ραντεβού σου είναι σε περίπου 2 ώρες. Τα λέμε εκεί!\n\n" + details);
         }
     }
 
