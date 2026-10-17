@@ -82,7 +82,7 @@ public class AppointmentService {
     @Transactional
     public AppointmentResponseDTO book(String customerEmail, AppointmentRequestDTO request) {
 
-        User customer = userRepository.findByEmail(customerEmail)
+        User customer = userRepository.findByEmailForUpdate(customerEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Barber barber = barberService.getApprovedById(request.barberId());
         ServiceOffering service = getActiveService(barber, request.serviceId());
@@ -93,21 +93,26 @@ public class AppointmentService {
         Instant endAt = startAt.plusSeconds(duration * 60L);
 
         if (!startAt.isAfter(clock.instant())) {
-            throw new BadRequestException("The appointment must be in the future");
+            throw new BadRequestException("APPOINTMENT_IN_PAST", "The appointment must be in the future");
         }
         if (!availabilityService.isWithinBookingWindow(request.startTime().toLocalDate())) {
-            throw new BadRequestException(
-                    "Appointments can be booked up to " + bookingProperties.maxDaysAhead() + " days ahead");
+            throw new BadRequestException("TOO_FAR_AHEAD", "Appointments can be booked up to " + bookingProperties.maxDaysAhead() + " days ahead");
         }
         if (!availabilityService.fitsSchedule(barber.getId(), request.startTime().toLocalDate(),
                 request.startTime().toLocalTime(), duration, barber.getSlotStepMinutes())) {
-            throw new BadRequestException("The barber is not working at this time");
+            throw new BadRequestException("BARBER_NOT_WORKING", "The barber is not working at this time");
         }
         if (!appointmentRepository.findActiveForBarberOverlapping(barber.getId(), startAt, endAt).isEmpty()) {
-            throw new ConflictException("This time is no longer available");
+            throw new ConflictException("SLOT_TAKEN", "This time is no longer available");
         }
         if (appointmentRepository.customerHasActiveOverlapping(customer.getId(), startAt, endAt)) {
-            throw new ConflictException("You already have an appointment at this time");
+            throw new ConflictException("CUSTOMER_OVERLAP", "You already have an appointment at this time");
+        }
+        // Once an appointment has started it no longer counts, so a new one can be booked.
+        if (appointmentRepository.countUpcomingActiveForCustomer(customer.getId(), clock.instant())
+                >= bookingProperties.maxActivePerCustomer()) {
+            throw new ConflictException("BOOKING_LIMIT",
+                    "You can have up to " + bookingProperties.maxActivePerCustomer() + " upcoming appointments");
         }
 
         AppointmentStatus status = barber.isAutoConfirmBookings()
@@ -120,7 +125,7 @@ public class AppointmentService {
             appointment = appointmentRepository.saveAndFlush(appointment);
         } catch (DataIntegrityViolationException e) {
             // Another customer booked an overlapping slot between our check and the insert.
-            throw new ConflictException("This time is no longer available");
+            throw new ConflictException("SLOT_TAKEN", "This time is no longer available");
         }
 
         publish(status == AppointmentStatus.CONFIRMED
@@ -149,13 +154,13 @@ public class AppointmentService {
 
         // A walk-in may be logged just after they sat down, but not long after.
         if (startAt.isBefore(now.minus(Duration.ofMinutes(30)))) {
-            throw new BadRequestException("The appointment must not be in the past");
+            throw new BadRequestException("APPOINTMENT_IN_PAST", "The appointment must not be in the past");
         }
         if (startAt.isAfter(now.plus(MANUAL_BOOKING_WINDOW))) {
-            throw new BadRequestException("Appointments can be entered up to 90 days ahead");
+            throw new BadRequestException("TOO_FAR_AHEAD", "Appointments can be entered up to 90 days ahead");
         }
         if (!appointmentRepository.findActiveForBarberOverlapping(barber.getId(), startAt, endAt).isEmpty()) {
-            throw new ConflictException("This time overlaps another appointment");
+            throw new ConflictException("SLOT_TAKEN", "This time overlaps another appointment");
         }
 
         Appointment appointment = Appointment.manual(barber, service, startAt, endAt,
@@ -163,7 +168,7 @@ public class AppointmentService {
         try {
             appointment = appointmentRepository.saveAndFlush(appointment);
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictException("This time overlaps another appointment");
+            throw new ConflictException("SLOT_TAKEN", "This time overlaps another appointment");
         }
         return AppointmentResponseDTO.from(appointment, zone);
     }
@@ -194,7 +199,7 @@ public class AppointmentService {
         // A pending request was never accepted, so it can be withdrawn at any time before it starts.
         Instant cutoff = appointment.getStartAt().minus(bookingProperties.cancellationCutoff());
         if (appointment.getStatus() == AppointmentStatus.CONFIRMED && clock.instant().isAfter(cutoff)) {
-            throw new BadRequestException("Appointments can be cancelled up to "
+            throw new BadRequestException("CANCEL_TOO_LATE", "Appointments can be cancelled up to "
                     + bookingProperties.cancellationCutoff().toHours() + " hours before they start");
         }
 
@@ -213,7 +218,7 @@ public class AppointmentService {
         LocalDate end = to != null ? to : today.plusDays(bookingProperties.maxDaysAhead());
 
         if (end.isBefore(start)) {
-            throw new BadRequestException("'to' must not be before 'from'");
+            throw new BadRequestException("INVALID_DATE_RANGE", "'to' must not be before 'from'");
         }
 
         return appointmentRepository.findAllByBarberIdAndStartAtGreaterThanEqualAndStartAtLessThanOrderByStartAt(
@@ -265,19 +270,19 @@ public class AppointmentService {
 
     private void requireActiveAndUpcoming(Appointment appointment) {
         if (!appointment.getStatus().isActive()) {
-            throw new BadRequestException("Appointment is already " + appointment.getStatus());
+            throw new BadRequestException("APPOINTMENT_NOT_ACTIVE", "Appointment is already " + appointment.getStatus());
         }
         if (!appointment.getStartAt().isAfter(clock.instant())) {
-            throw new BadRequestException("Appointment has already started");
+            throw new BadRequestException("APPOINTMENT_STARTED", "Appointment has already started");
         }
     }
 
     private void requirePendingAndUpcoming(Appointment appointment) {
         if (appointment.getStatus() != AppointmentStatus.PENDING) {
-            throw new BadRequestException("Only pending appointments can be confirmed or rejected");
+            throw new BadRequestException("APPOINTMENT_NOT_PENDING", "Only pending appointments can be confirmed or rejected");
         }
         if (!appointment.getStartAt().isAfter(clock.instant())) {
-            throw new BadRequestException("Appointment has already started");
+            throw new BadRequestException("APPOINTMENT_STARTED", "Appointment has already started");
         }
     }
 

@@ -249,6 +249,41 @@ class AppointmentFlowTest extends IntegrationTest {
         assertThat(succeeded).isEqualTo(1);
     }
 
+    // A customer holds at most two upcoming appointments, across all barbers, so nobody can block
+    // a barber's week. One that has started, or was cancelled, frees a place.
+    @Test
+    void customersHoldAtMostTwoUpcomingAppointments() throws Exception {
+        User otherBarberUser = createUser("Kostas", "kostas@test.gr", Role.BARBER);
+        Barber otherBarber = createApprovedBarber(otherBarberUser, true);
+        ServiceOffering beard = createService(otherBarber, "Beard", 30, "8.00");
+        addShift(otherBarber, DayOfWeek.TUESDAY, "10:00", "14:00");
+
+        long first = idOf(book(customer, TUESDAY + "T11:00"));
+        book(customer, TUESDAY + "T10:00").andExpect(status().isCreated());
+
+        book(customer, otherBarber.getId(), beard.getId(), TUESDAY + "T12:00")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOKING_LIMIT"));
+
+        customerCancel(customer, first).andExpect(status().isOk());
+        book(customer, otherBarber.getId(), beard.getId(), TUESDAY + "T12:00").andExpect(status().isCreated());
+        book(customer, TUESDAY + "T13:00").andExpect(status().isConflict());
+
+        clock.set(java.time.Instant.parse("2030-01-08T08:01:00Z")); // Tuesday 10:01 Athens: 10:00 has started
+        book(customer, TUESDAY + "T13:00").andExpect(status().isCreated());
+    }
+
+    @Test
+    void errorsCarryACodeTheAppCanTranslate() throws Exception {
+        book(customer, TUESDAY + "T10:00").andExpect(status().isCreated());
+        book(otherCustomer, TUESDAY + "T10:00")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SLOT_TAKEN"));
+        book(otherCustomer, TUESDAY + "T15:00")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BARBER_NOT_WORKING"));
+    }
+
     // ---- cancellation ----
 
     @Test
