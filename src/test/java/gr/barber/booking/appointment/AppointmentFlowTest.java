@@ -229,7 +229,7 @@ class AppointmentFlowTest extends IntegrationTest {
                 start.await();
                 try {
                     appointmentService.book(c.getEmail(), new AppointmentRequestDTO(
-                            barber.getId(), haircut.getId(), LocalDateTime.parse(TUESDAY + "T10:00"), null));
+                            barber.getId(), haircut.getId(), LocalDateTime.parse(TUESDAY + "T10:00"), null, null));
                     return true;
                 } catch (ConflictException e) {
                     return false;

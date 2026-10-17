@@ -103,7 +103,9 @@ public class BarberDirectoryService {
         if (ids.isEmpty()) {
             return Map.of();
         }
+        // Extras are add-ons: the starting price and next free time come from the main services.
         Map<Long, List<ServiceOffering>> services = serviceRepository.findAllByBarberIdInAndActiveTrue(ids).stream()
+                .filter(ServiceOffering::isMain)
                 .collect(Collectors.groupingBy(service -> service.getBarber().getId()));
         Map<Long, List<String>> photoKeys = new HashMap<>();
         for (Object[] row : photoRepository.findKeysNewestFirst(ids)) {

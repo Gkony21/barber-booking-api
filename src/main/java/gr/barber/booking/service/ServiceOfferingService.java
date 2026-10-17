@@ -71,5 +71,8 @@ public class ServiceOfferingService {
         service.setDescription(request.description());
         service.setDurationMinutes(request.durationMinutes());
         service.setPrice(request.price());
+        if (request.kind() != null) {
+            service.setKind(request.kind());
+        }
     }
 }

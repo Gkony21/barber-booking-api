@@ -98,7 +98,9 @@ public class AppointmentEmailListener {
     }
 
     private static String details(AppointmentEvent event) {
+        String extras = event.extraNames().isEmpty() ? "" : "Έξτρα: " + String.join(", ", event.extraNames()) + "\n";
         return "Υπηρεσία: " + event.serviceName() + "\n"
+                + extras
                 + "Πότε: " + when(event) + "\n"
                 + "Barber: " + event.barberName() + "\n"
                 + "Πελάτης: " + event.customerName() + "\n"

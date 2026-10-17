@@ -27,6 +27,10 @@ public class ServiceOffering {
     @Column(nullable = false, precision = 8, scale = 2)
     private BigDecimal price;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ServiceKind kind = ServiceKind.MAIN;
+
     // Deactivated instead of deleted so appointments can keep referencing it.
     @Column(nullable = false)
     private boolean active = true;
@@ -44,6 +48,18 @@ public class ServiceOffering {
 
     public Barber getBarber() {
         return barber;
+    }
+
+    public ServiceKind getKind() {
+        return kind;
+    }
+
+    public void setKind(ServiceKind kind) {
+        this.kind = kind;
+    }
+
+    public boolean isMain() {
+        return kind == ServiceKind.MAIN;
     }
 
     public String getName() {
