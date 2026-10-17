@@ -98,6 +98,6 @@ public abstract class IntegrationTest {
     }
 
     protected String bearer(User user) {
-        return "Bearer " + jwtService.generateToken(user.getEmail(), user.getRole().name());
+        return "Bearer " + jwtService.generateToken(user);
     }
 }

@@ -1,5 +1,6 @@
 package gr.barber.booking.auth;
 
+import com.jayway.jsonpath.JsonPath;
 import gr.barber.booking.model.Role;
 import gr.barber.booking.model.User;
 import gr.barber.booking.support.IntegrationTest;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -62,6 +64,21 @@ class PasswordTest extends IntegrationTest {
 
         login("maria@test.gr", "old-secret-42").andExpect(status().isUnauthorized());
         login("maria@test.gr", "brand-new-secret").andExpect(status().isOk());
+    }
+
+    @Test
+    void resettingThePasswordSignsOutEveryDevice() throws Exception {
+        String oldSession = bearer(maria);
+        mockMvc.perform(get("/appointments/me").header("Authorization", oldSession)).andExpect(status().isOk());
+
+        forgot("maria@test.gr");
+        String token = events.stream(PasswordResetRequested.class).findFirst().orElseThrow().token();
+        reset(token, "brand-new-secret").andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/appointments/me").header("Authorization", oldSession)).andExpect(status().isUnauthorized());
+        String newSession = "Bearer " + JsonPath.read(
+                login("maria@test.gr", "brand-new-secret").andReturn().getResponse().getContentAsString(), "$.token");
+        mockMvc.perform(get("/appointments/me").header("Authorization", newSession)).andExpect(status().isOk());
     }
 
     @Test

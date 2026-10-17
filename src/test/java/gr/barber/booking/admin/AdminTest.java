@@ -21,19 +21,30 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminTest extends IntegrationTest {
 
     @Test
-    void configuredEmailsBecomeVerifiedAdminsOnStartup() {
-        User owner = createUser("Owner", "owner@test.gr", Role.CUSTOMER);
-        owner.setEmailVerified(false);
-        userRepository.save(owner);
+    void configuredEmailsBecomeAdminsOnStartup() {
+        createUser("Owner", "owner@test.gr", Role.CUSTOMER);
         createUser("Other", "other@test.gr", Role.CUSTOMER);
 
         new AdminBootstrap(userRepository, List.of(" Owner@Test.gr ", "missing@test.gr", ""))
                 .run(new DefaultApplicationArguments());
 
-        User promoted = userRepository.findByEmail("owner@test.gr").orElseThrow();
-        assertThat(promoted.getRole()).isEqualTo(Role.ADMIN);
-        assertThat(promoted.isEmailVerified()).isTrue();
+        assertThat(userRepository.findByEmail("owner@test.gr").orElseThrow().getRole()).isEqualTo(Role.ADMIN);
         assertThat(userRepository.findByEmail("other@test.gr").orElseThrow().getRole()).isEqualTo(Role.CUSTOMER);
+    }
+
+    // Someone could register the admin's address first with their own password; until the
+    // address is verified, nothing proves the account belongs to the admin.
+    @Test
+    void unverifiedAccountsAreNotMadeAdmin() {
+        User squatter = createUser("Someone", "owner@test.gr", Role.CUSTOMER);
+        squatter.setEmailVerified(false);
+        userRepository.save(squatter);
+
+        new AdminBootstrap(userRepository, List.of("owner@test.gr")).run(new DefaultApplicationArguments());
+
+        User account = userRepository.findByEmail("owner@test.gr").orElseThrow();
+        assertThat(account.getRole()).isEqualTo(Role.CUSTOMER);
+        assertThat(account.isEmailVerified()).isFalse();
     }
 
     @Test
