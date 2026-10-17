@@ -33,7 +33,7 @@ public class BarberService {
     public BarberResponseDTO createProfile(String email, BarberRequestDTO request) {
 
         if (barberRepository.existsByUserEmail(email)) {
-            throw new ConflictException("Barber profile already exists");
+            throw new ConflictException("PROFILE_EXISTS", "Barber profile already exists");
         }
 
         User user = userRepository.findByEmail(email)
@@ -100,7 +100,7 @@ public class BarberService {
         }
         if (request.slotStepMinutes() != null) {
             if (request.slotStepMinutes() != 15 && request.slotStepMinutes() != 30) {
-                throw new BadRequestException("Appointments can start every 15 or 30 minutes");
+                throw new BadRequestException("INVALID_SLOT_STEP", "Appointments can start every 15 or 30 minutes");
             }
             barber.setSlotStepMinutes(request.slotStepMinutes());
         }

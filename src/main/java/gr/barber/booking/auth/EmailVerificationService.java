@@ -50,7 +50,7 @@ public class EmailVerificationService {
 
         EmailVerificationToken verificationToken = tokenRepository.findByTokenHash(SecureTokens.hash(token))
                 .filter(t -> t.isUsable(now))
-                .orElseThrow(() -> new BadRequestException("Invalid or expired verification link"));
+                .orElseThrow(() -> new BadRequestException("INVALID_VERIFICATION_LINK", "Invalid or expired verification link"));
 
         verificationToken.markUsed(now);
         verificationToken.getUser().setEmailVerified(true);

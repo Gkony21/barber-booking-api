@@ -71,7 +71,7 @@ public class BarberPhotoService {
     public PhotoDTO addPhoto(String email, MultipartFile file, String caption) {
         Barber barber = barberService.getByEmail(email);
         if (photoRepository.countByBarberId(barber.getId()) >= MAX_PHOTOS) {
-            throw new BadRequestException("You can have up to " + MAX_PHOTOS + " photos; delete one first");
+            throw new BadRequestException("TOO_MANY_PHOTOS", "You can have up to " + MAX_PHOTOS + " photos; delete one first");
         }
         String key = storage.save(imageProcessor.photo(bytes(file), PHOTO_MAX_SIDE));
         BarberPhoto photo = new BarberPhoto(barber, key);
@@ -94,7 +94,7 @@ public class BarberPhotoService {
         }
         String trimmed = caption.strip();
         if (trimmed.length() > 80) {
-            throw new BadRequestException("Captions can be up to 80 characters");
+            throw new BadRequestException("CAPTION_TOO_LONG", "Captions can be up to 80 characters");
         }
         return trimmed;
     }
@@ -116,12 +116,12 @@ public class BarberPhotoService {
 
     private static byte[] bytes(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new BadRequestException("Choose an image to upload");
+            throw new BadRequestException("NO_IMAGE", "Choose an image to upload");
         }
         try {
             return file.getBytes();
         } catch (IOException e) {
-            throw new BadRequestException("Could not read the uploaded file");
+            throw new BadRequestException("NOT_AN_IMAGE", "Could not read the uploaded file");
         }
     }
 

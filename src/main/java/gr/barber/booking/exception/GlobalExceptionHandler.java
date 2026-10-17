@@ -1,5 +1,6 @@
 package gr.barber.booking.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
@@ -12,48 +13,56 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Every error answer is RFC 7807 problem details. Where the person can act on it, a "code" tells
+ * the web app which (Greek) message to show; "detail" stays English, for developers.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({UserNotFoundException.class, ResourceNotFoundException.class})
-    public ProblemDetail handleNotFound(RuntimeException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ProblemDetail handleNotFound(ResourceNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, exception);
     }
 
     @ExceptionHandler(ConflictException.class)
     public ProblemDetail handleConflict(ConflictException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        return problem(HttpStatus.CONFLICT, exception);
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ProblemDetail handleBadRequest(BadRequestException exception) {
+        return problem(HttpStatus.BAD_REQUEST, exception);
     }
 
     @ExceptionHandler(UnauthorizedException.class)
     public ProblemDetail handleUnauthorized(UnauthorizedException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
+        return withCode(ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage()), "INVALID_CREDENTIALS");
     }
 
     // The code lets the client show a "resend verification email" action.
     @ExceptionHandler(EmailNotVerifiedException.class)
     public ProblemDetail handleEmailNotVerified(EmailNotVerifiedException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
-        problem.setProperty("code", "EMAIL_NOT_VERIFIED");
-        return problem;
+        return withCode(ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage()), "EMAIL_NOT_VERIFIED");
     }
 
-    // The code lets the client explain the problem in the user's language.
     @ExceptionHandler(WeakPasswordException.class)
     public ProblemDetail handleWeakPassword(WeakPasswordException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
-        problem.setProperty("code", "WEAK_PASSWORD");
-        return problem;
-    }
-
-    @ExceptionHandler(BadRequestException.class)
-    public ProblemDetail handleBadRequest(BadRequestException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+        return withCode(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage()), "WEAK_PASSWORD");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ProblemDetail handleTooLarge(MaxUploadSizeExceededException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "The file is too large (max 10 MB)");
+        return withCode(ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "The file is too large (max 10 MB)"),
+                "FILE_TOO_LARGE");
+    }
+
+    // A unique or overlap rule in the database caught a race the service checks could not
+    // (e.g. two barbers picking the same link at once): the request conflicts with current data.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataConflict(DataIntegrityViolationException exception) {
+        return withCode(ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "The request conflicts with existing data"),
+                "CONFLICT");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -65,7 +74,8 @@ public class GlobalExceptionHandler {
                         (first, second) -> first
                 ));
 
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        ProblemDetail problem = withCode(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed"),
+                "VALIDATION_FAILED");
         problem.setProperty("errors", errors);
         return problem;
     }
@@ -79,8 +89,20 @@ public class GlobalExceptionHandler {
                         : String.valueOf(error.getDefaultMessage()))
                 .toList();
 
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        ProblemDetail problem = withCode(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed"),
+                "VALIDATION_FAILED");
         problem.setProperty("errors", errors);
+        return problem;
+    }
+
+    private static ProblemDetail problem(HttpStatus status, ApiException exception) {
+        return withCode(ProblemDetail.forStatusAndDetail(status, exception.getMessage()), exception.getCode());
+    }
+
+    private static ProblemDetail withCode(ProblemDetail problem, String code) {
+        if (code != null) {
+            problem.setProperty("code", code);
+        }
         return problem;
     }
 }

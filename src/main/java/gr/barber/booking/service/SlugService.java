@@ -59,13 +59,13 @@ public class SlugService {
     public String validate(String requested, Long barberId) {
         String slug = requested.strip().toLowerCase(Locale.ROOT);
         if (slug.length() < MIN || slug.length() > MAX || !VALID.matcher(slug).matches()) {
-            throw new BadRequestException("Links use 3-30 Latin letters, digits and single dashes");
+            throw new BadRequestException("INVALID_LINK", "Links use 3-30 Latin letters, digits and single dashes");
         }
         if (RESERVED.contains(slug)) {
-            throw new ConflictException("This link is not available");
+            throw new ConflictException("LINK_TAKEN", "This link is not available");
         }
         if (isTaken(slug, barberId)) {
-            throw new ConflictException("This link is already taken");
+            throw new ConflictException("LINK_TAKEN", "This link is already taken");
         }
         return slug;
     }
