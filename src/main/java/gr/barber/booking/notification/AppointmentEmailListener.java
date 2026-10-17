@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.format.DateTimeFormatter;
@@ -32,6 +33,7 @@ public class AppointmentEmailListener {
         this.frontendUrl = frontendUrl;
     }
 
+    @Async
     @TransactionalEventListener
     public void onAppointmentEvent(AppointmentEvent event) {
 
@@ -75,7 +77,7 @@ public class AppointmentEmailListener {
         if (event.customerEmail() == null) {
             return; // phone or walk-in customer without an account
         }
-        send(event.customerEmail(), subject, "Γεια σου,\n\n" + body);
+        send(event.customerEmail(), subject, "Γεια σου,\n\n" + body, "Δες τα ραντεβού σου: " + frontendUrl + "/appointments");
     }
 
     // Barbers also get the customer's phone, in case they need to reach them.
@@ -83,12 +85,13 @@ public class AppointmentEmailListener {
         String phone = event.customerPhone() != null && !event.customerPhone().isBlank()
                 ? "\nΤηλέφωνο πελάτη: " + event.customerPhone()
                 : "";
-        send(event.barberEmail(), subject, "Γεια σου,\n\n" + body + phone);
+        // Barbers manage bookings from their schedule, not the customers' appointments page.
+        send(event.barberEmail(), subject, "Γεια σου,\n\n" + body + phone, "Δες το πρόγραμμά σου: " + frontendUrl + "/barber");
     }
 
-    private void send(String to, String subject, String body) {
+    private void send(String to, String subject, String body, String link) {
         try {
-            emailService.send(to, subject, body + "\n\nΔες τα ραντεβού σου: " + frontendUrl + "/appointments\n");
+            emailService.send(to, subject, body + "\n\n" + link + "\n");
         } catch (MailException e) {
             log.error("Could not send appointment email to {}", to, e);
         }

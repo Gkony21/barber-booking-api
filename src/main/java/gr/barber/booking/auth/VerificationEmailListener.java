@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
@@ -20,6 +21,7 @@ public class VerificationEmailListener {
 
     // Runs after commit: no email for a registration that rolled back, and a mail
     // server outage does not fail the registration (the user can ask for a resend).
+    @Async
     @TransactionalEventListener
     public void onVerificationEmailRequested(VerificationEmailRequested event) {
         try {
