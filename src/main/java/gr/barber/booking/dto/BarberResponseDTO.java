@@ -26,6 +26,9 @@ public record BarberResponseDTO(
         int bookingWindowDays,
         Long shopId,
         String shopName,
+        // Where customers find a barber who works in a shop; the barber's own address otherwise applies.
+        String shopAddress,
+        String shopCity,
         // Filled in for the public listing and profile; null/0 elsewhere.
         String coverUrl,
         long photoCount,
@@ -62,6 +65,8 @@ public record BarberResponseDTO(
                 barber.getBookingWindowDays(),
                 shop != null ? shop.getId() : null,
                 shop != null ? shop.getName() : null,
+                shop != null ? shop.getAddress() : null,
+                shop != null ? shop.getCity() : null,
                 MediaController.url(listing.coverKey()),
                 listing.photoCount(),
                 listing.fromPrice(),
