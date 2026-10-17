@@ -160,7 +160,7 @@ public class AppointmentService {
             throw new BadRequestException("TOO_FAR_AHEAD", "Appointments can be entered up to 90 days ahead");
         }
         if (!appointmentRepository.findActiveForBarberOverlapping(barber.getId(), startAt, endAt).isEmpty()) {
-            throw new ConflictException("SLOT_TAKEN", "This time overlaps another appointment");
+            throw new ConflictException("OVERLAPS_APPOINTMENT", "This time overlaps another appointment");
         }
 
         Appointment appointment = Appointment.manual(barber, service, startAt, endAt,
@@ -168,7 +168,7 @@ public class AppointmentService {
         try {
             appointment = appointmentRepository.saveAndFlush(appointment);
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictException("SLOT_TAKEN", "This time overlaps another appointment");
+            throw new ConflictException("OVERLAPS_APPOINTMENT", "This time overlaps another appointment");
         }
         return AppointmentResponseDTO.from(appointment, zone);
     }
