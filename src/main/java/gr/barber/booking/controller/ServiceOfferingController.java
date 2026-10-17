@@ -44,10 +44,18 @@ public class ServiceOfferingController {
         return serviceOfferingService.updateService(authentication.getName(), serviceId, request);
     }
 
+    // Hides the service from customers; saving it again (PUT) shows it again.
+    @PostMapping("/me/services/{serviceId}/hide")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void hideService(@PathVariable Long serviceId, Authentication authentication) {
+        serviceOfferingService.hideService(authentication.getName(), serviceId);
+    }
+
+    // Removes it for good; appointments already booked with it are kept unchanged.
     @DeleteMapping("/me/services/{serviceId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deactivateService(@PathVariable Long serviceId, Authentication authentication) {
-        serviceOfferingService.deactivateService(authentication.getName(), serviceId);
+    public void deleteService(@PathVariable Long serviceId, Authentication authentication) {
+        serviceOfferingService.deleteService(authentication.getName(), serviceId);
     }
 
 }

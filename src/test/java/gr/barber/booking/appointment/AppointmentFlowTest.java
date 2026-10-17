@@ -200,16 +200,41 @@ class AppointmentFlowTest extends IntegrationTest {
     }
 
     @Test
-    void deactivatedServiceCannotBeBookedButExistingBookingsKeepItsDetails() throws Exception {
+    void hiddenServiceCannotBeBookedButStaysOnTheBarbersList() throws Exception {
+        mockMvc.perform(post("/barbers/me/services/{id}/hide", haircut.getId()).header("Authorization", bearer(barberUser)))
+                .andExpect(status().isNoContent());
+
+        book(customer, TUESDAY + "T11:00").andExpect(status().isNotFound());
+        mockMvc.perform(get("/barbers/me/services").header("Authorization", bearer(barberUser)))
+                .andExpect(jsonPath("$[0].name").value("Haircut"))
+                .andExpect(jsonPath("$[0].active").value(false));
+    }
+
+    // Deleting removes the service everywhere, while appointments already booked keep its details.
+    @Test
+    void deletedServiceDisappearsButExistingBookingsKeepItsDetails() throws Exception {
         book(customer, TUESDAY + "T10:00").andExpect(status().isCreated());
 
         mockMvc.perform(delete("/barbers/me/services/" + haircut.getId()).header("Authorization", bearer(barberUser)))
                 .andExpect(status().isNoContent());
 
         book(otherCustomer, TUESDAY + "T11:00").andExpect(status().isNotFound());
+        mockMvc.perform(get("/barbers/me/services").header("Authorization", bearer(barberUser)))
+                .andExpect(jsonPath("$", hasSize(0)));
+        mockMvc.perform(get("/barbers/{id}/services", barber.getId())).andExpect(jsonPath("$", hasSize(0)));
         mockMvc.perform(get("/appointments/me").header("Authorization", bearer(customer)))
                 .andExpect(jsonPath("$[0].serviceName").value("Haircut"))
                 .andExpect(jsonPath("$[0].price").value(12.00));
+        mockMvc.perform(get("/barbers/me/appointments").header("Authorization", bearer(barberUser)))
+                .andExpect(jsonPath("$[0].serviceName").value("Haircut"));
+
+        // Gone for good: it cannot be edited back.
+        mockMvc.perform(put("/barbers/me/services/{id}", haircut.getId())
+                        .header("Authorization", bearer(barberUser))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Haircut","durationMinutes":30,"price":12.00}"""))
+                .andExpect(status().isNotFound());
     }
 
     @Test
