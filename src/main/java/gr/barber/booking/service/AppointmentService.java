@@ -72,7 +72,7 @@ public class AppointmentService {
         ServiceOffering service = getActiveService(barber, serviceId);
 
         List<String> startTimes = availabilityService
-                .findAvailableStartTimes(barber.getId(), date, service.getDurationMinutes(), barber.getSlotStepMinutes()).stream()
+                .findAvailableStartTimes(barber, date, service.getDurationMinutes()).stream()
                 .map(TIME_FORMAT::format)
                 .toList();
 
@@ -95,11 +95,12 @@ public class AppointmentService {
         if (!startAt.isAfter(clock.instant())) {
             throw new BadRequestException("APPOINTMENT_IN_PAST", "The appointment must be in the future");
         }
-        if (!availabilityService.isWithinBookingWindow(request.startTime().toLocalDate())) {
-            throw new BadRequestException("TOO_FAR_AHEAD", "Appointments can be booked up to " + bookingProperties.maxDaysAhead() + " days ahead");
+        if (!availabilityService.isWithinBookingWindow(barber, request.startTime().toLocalDate())) {
+            throw new BadRequestException("TOO_FAR_AHEAD",
+                    "This barber takes bookings up to " + barber.getBookingWindowDays() + " days ahead");
         }
-        if (!availabilityService.fitsSchedule(barber.getId(), request.startTime().toLocalDate(),
-                request.startTime().toLocalTime(), duration, barber.getSlotStepMinutes())) {
+        if (!availabilityService.fitsSchedule(barber, request.startTime().toLocalDate(),
+                request.startTime().toLocalTime(), duration)) {
             throw new BadRequestException("BARBER_NOT_WORKING", "The barber is not working at this time");
         }
         if (!appointmentRepository.findActiveForBarberOverlapping(barber.getId(), startAt, endAt).isEmpty()) {
@@ -215,7 +216,7 @@ public class AppointmentService {
         ZoneId zone = zone();
         LocalDate today = LocalDate.now(clock.withZone(zone));
         LocalDate start = from != null ? from : today;
-        LocalDate end = to != null ? to : today.plusDays(bookingProperties.maxDaysAhead());
+        LocalDate end = to != null ? to : today.plusDays(barber.getBookingWindowDays());
 
         if (end.isBefore(start)) {
             throw new BadRequestException("INVALID_DATE_RANGE", "'to' must not be before 'from'");

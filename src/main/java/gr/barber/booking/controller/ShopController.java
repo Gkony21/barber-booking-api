@@ -1,7 +1,7 @@
 package gr.barber.booking.controller;
 
-import gr.barber.booking.dto.AddShopBarberDTO;
-import gr.barber.booking.dto.BarberResponseDTO;
+import gr.barber.booking.dto.ShopInvitationDTO;
+import gr.barber.booking.dto.ShopInviteRequestDTO;
 import gr.barber.booking.dto.ShopRequestDTO;
 import gr.barber.booking.dto.ShopResponseDTO;
 import gr.barber.booking.service.ShopService;
@@ -52,12 +52,24 @@ public class ShopController {
         shopService.deleteShop(id, authentication.getName());
     }
 
-    @PostMapping("/{id}/barbers")
+    // Owners invite barbers by their sign-up email; the barber joins by accepting.
+    @PostMapping("/{id}/invitations")
     @ResponseStatus(HttpStatus.CREATED)
-    public BarberResponseDTO addBarber(@PathVariable Long id,
-                                       @Valid @RequestBody AddShopBarberDTO request,
-                                       Authentication authentication) {
-        return shopService.addBarber(id, authentication.getName(), request.email());
+    public ShopInvitationDTO invite(@PathVariable Long id,
+                                    @Valid @RequestBody ShopInviteRequestDTO request,
+                                    Authentication authentication) {
+        return shopService.invite(id, authentication.getName(), request.email());
+    }
+
+    @GetMapping("/{id}/invitations")
+    public List<ShopInvitationDTO> getInvitations(@PathVariable Long id, Authentication authentication) {
+        return shopService.getPendingInvitations(id, authentication.getName());
+    }
+
+    @DeleteMapping("/{id}/invitations/{invitationId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelInvitation(@PathVariable Long id, @PathVariable Long invitationId, Authentication authentication) {
+        shopService.cancelInvitation(id, invitationId, authentication.getName());
     }
 
     @DeleteMapping("/{id}/barbers/{barberId}")

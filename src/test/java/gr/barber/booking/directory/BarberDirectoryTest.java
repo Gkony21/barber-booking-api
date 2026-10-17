@@ -4,13 +4,20 @@ import gr.barber.booking.model.Barber;
 import gr.barber.booking.model.BarberPhoto;
 import gr.barber.booking.model.Role;
 import gr.barber.booking.repository.BarberPhotoRepository;
+import gr.barber.booking.model.TimeOff;
+import gr.barber.booking.repository.TimeOffRepository;
 import gr.barber.booking.support.IntegrationTest;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -20,6 +27,12 @@ class BarberDirectoryTest extends IntegrationTest {
 
     @Autowired
     private BarberPhotoRepository photoRepository;
+
+    @Autowired
+    private TimeOffRepository timeOffRepository;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     private Barber tomorrow;
     private Barber tonight;
@@ -69,5 +82,39 @@ class BarberDirectoryTest extends IntegrationTest {
         mockMvc.perform(get("/barbers/{id}", tonight.getId()))
                 .andExpect(jsonPath("$.nextAvailable").value("2030-01-07T17:00:00+02:00"))
                 .andExpect(jsonPath("$.photoCount").value(2));
+    }
+
+    // The next free time is searched only as far as the barber lets customers book.
+    @Test
+    void nextFreeTimeStaysWithinTheBarbersBookingWindow() throws Exception {
+        // Off for the next three weeks: free again on Tuesday 29 January, 22 days from now.
+        timeOffRepository.save(new TimeOff(tomorrow, LocalDate.parse("2030-01-07"), LocalDate.parse("2030-01-28"), null));
+
+        mockMvc.perform(get("/barbers/{id}", tomorrow.getId())).andExpect(jsonPath("$.nextAvailable").doesNotExist());
+
+        tomorrow.setBookingWindowDays(30);
+        barberRepository.save(tomorrow);
+
+        mockMvc.perform(get("/barbers/{id}", tomorrow.getId()))
+                .andExpect(jsonPath("$.bookingWindowDays").value(30))
+                .andExpect(jsonPath("$.nextAvailable").value("2030-01-29T10:00:00+02:00"));
+    }
+
+    // The list used to run dozens of queries per barber; now the count does not grow with them.
+    @Test
+    void listQueriesDoNotGrowWithTheNumberOfBarbers() throws Exception {
+        for (int i = 0; i < 12; i++) {
+            Barber barber = createApprovedBarber(createUser("Barber " + i, "b" + i + "@test.gr", Role.BARBER), true);
+            barber.setBookingWindowDays(60);
+            barberRepository.save(barber);
+            createService(barber, "Haircut", 30, "10.00");
+            addShift(barber, DayOfWeek.SUNDAY, "10:00", "11:00");
+        }
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        mockMvc.perform(get("/barbers")).andExpect(jsonPath("$", hasSize(15)));
+
+        assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(8);
     }
 }

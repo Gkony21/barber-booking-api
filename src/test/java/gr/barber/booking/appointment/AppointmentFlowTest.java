@@ -30,6 +30,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -282,6 +283,32 @@ class AppointmentFlowTest extends IntegrationTest {
         book(otherCustomer, TUESDAY + "T15:00")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BARBER_NOT_WORKING"));
+    }
+
+    // Each barber chooses how far ahead customers can book: 14 days (default), a month or two months.
+    @Test
+    void customersBookWithinTheBarbersBookingWindow() throws Exception {
+        String inThreeWeeks = "2030-01-28"; // a Monday, 21 days from now
+
+        availability(inThreeWeeks).andExpect(jsonPath("$.startTimes", hasSize(0)));
+        book(customer, inThreeWeeks + "T10:00")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TOO_FAR_AHEAD"));
+
+        setBookingWindow(45).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_BOOKING_WINDOW"));
+        setBookingWindow(30).andExpect(status().isOk()).andExpect(jsonPath("$.bookingWindowDays").value(30));
+
+        availability(inThreeWeeks).andExpect(jsonPath("$.startTimes[0]").value("10:00"));
+        book(customer, inThreeWeeks + "T10:00").andExpect(status().isCreated());
+        book(otherCustomer, "2030-02-07T10:00").andExpect(status().isBadRequest()); // a month and a bit
+    }
+
+    private ResultActions setBookingWindow(int days) throws Exception {
+        return mockMvc.perform(put("/barbers/me")
+                .header("Authorization", bearer(barberUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"bookingWindowDays":%d}""".formatted(days)));
     }
 
     // ---- cancellation ----

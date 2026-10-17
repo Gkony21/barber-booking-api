@@ -98,6 +98,12 @@ public class BarberService {
         if (request.slug() != null && !request.slug().equalsIgnoreCase(barber.getSlug())) {
             barber.setSlug(slugService.validate(request.slug(), barber.getId()));
         }
+        if (request.bookingWindowDays() != null) {
+            if (!Barber.ALLOWED_BOOKING_WINDOWS.contains(request.bookingWindowDays())) {
+                throw new BadRequestException("INVALID_BOOKING_WINDOW", "Bookings can open 14, 30 or 60 days ahead");
+            }
+            barber.setBookingWindowDays(request.bookingWindowDays());
+        }
         if (request.slotStepMinutes() != null) {
             if (request.slotStepMinutes() != 15 && request.slotStepMinutes() != 30) {
                 throw new BadRequestException("INVALID_SLOT_STEP", "Appointments can start every 15 or 30 minutes");

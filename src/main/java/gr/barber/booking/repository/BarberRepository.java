@@ -2,6 +2,7 @@ package gr.barber.booking.repository;
 
 import gr.barber.booking.model.Barber;
 import gr.barber.booking.model.BarberStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -22,12 +23,18 @@ public interface BarberRepository extends JpaRepository<Barber, Long> {
 
     Optional<Barber> findByIdAndStatus(Long id, BarberStatus status);
 
+    // The listing shows each barber's name and shop, so they are loaded in the same query.
+    @EntityGraph(attributePaths = {"user", "shop"})
     List<Barber> findAllByStatus(BarberStatus status);
 
     List<Barber> findAllByStatusOrderByCreatedAtAsc(BarberStatus status);
 
+    // The listing shows each barber's name and shop, so they are loaded in the same query.
+    @EntityGraph(attributePaths = {"user", "shop"})
     List<Barber> findAllByStatusAndShopId(BarberStatus status, Long shopId);
 
+    // The listing shows each barber's name and shop, so they are loaded in the same query.
+    @EntityGraph(attributePaths = {"user", "shop"})
     @Query("""
             select b from Barber b left join b.shop s
             where b.status = :status

@@ -2,6 +2,7 @@ package gr.barber.booking.service;
 
 import gr.barber.booking.config.BookingProperties;
 import gr.barber.booking.dto.BarberResponseDTO;
+import gr.barber.booking.exception.ResourceNotFoundException;
 import gr.barber.booking.model.Barber;
 import gr.barber.booking.model.BarberStatus;
 import gr.barber.booking.model.ServiceOffering;
@@ -14,12 +15,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * The barbers customers browse: approved profiles with a cover photo, starting price and the
@@ -69,8 +73,9 @@ public class BarberDirectoryService {
         }
 
         LocalDate today = today();
+        Map<Long, BarberResponseDTO.Listing> listings = listings(barbers);
         return barbers.stream()
-                .map(barber -> BarberResponseDTO.from(barber, listing(barber)))
+                .map(barber -> BarberResponseDTO.from(barber, listings.get(barber.getId())))
                 .filter(dto -> !availableToday
                         || (dto.nextAvailable() != null && dto.nextAvailable().toLocalDate().equals(today)))
                 .sorted(Comparator.comparing(BarberResponseDTO::nextAvailable,
@@ -80,52 +85,49 @@ public class BarberDirectoryService {
 
     @Transactional(readOnly = true)
     public BarberResponseDTO getBySlug(String slug) {
-        Barber barber = barberRepository.findBySlugAndStatus(slug.toLowerCase(java.util.Locale.ROOT), BarberStatus.APPROVED)
-                .orElseThrow(() -> new gr.barber.booking.exception.ResourceNotFoundException("Barber not found"));
-        return BarberResponseDTO.from(barber, listing(barber));
+        Barber barber = barberRepository.findBySlugAndStatus(slug.toLowerCase(Locale.ROOT), BarberStatus.APPROVED)
+                .orElseThrow(() -> new ResourceNotFoundException("Barber not found"));
+        return BarberResponseDTO.from(barber, listings(List.of(barber)).get(barber.getId()));
     }
 
     @Transactional(readOnly = true)
     public BarberResponseDTO get(Long id) {
         Barber barber = barberService.getApprovedById(id);
-        return BarberResponseDTO.from(barber, listing(barber));
+        return BarberResponseDTO.from(barber, listings(List.of(barber)).get(barber.getId()));
     }
 
-    private BarberResponseDTO.Listing listing(Barber barber) {
-        List<ServiceOffering> services = serviceRepository.findAllByBarberIdAndActiveTrueOrderByName(barber.getId());
-        // Free extras (e.g. a 0 € wash) would make every barber read "από 0 €".
-        BigDecimal fromPrice = services.stream().map(ServiceOffering::getPrice)
-                .filter(price -> price.signum() > 0)
-                .min(Comparator.naturalOrder()).orElse(null);
-        String coverKey = photoRepository.findTopByBarberIdOrderByCreatedAtDescIdDesc(barber.getId())
-                .map(photo -> photo.getImageKey())
-                .orElse(null);
-
-        return new BarberResponseDTO.Listing(
-                coverKey,
-                photoRepository.countByBarberId(barber.getId()),
-                fromPrice,
-                nextAvailable(barber, services));
-    }
-
-    // The first free start for the barber's shortest service, within the booking window.
-    private OffsetDateTime nextAvailable(Barber barber, List<ServiceOffering> services) {
-        Integer shortest = services.stream().map(ServiceOffering::getDurationMinutes).filter(Objects::nonNull)
-                .min(Comparator.naturalOrder()).orElse(null);
-        if (shortest == null) {
-            return null;
+    // Cover, photo count, starting price and next free time for every barber, in a handful of
+    // queries in total rather than dozens per barber.
+    private Map<Long, BarberResponseDTO.Listing> listings(List<Barber> barbers) {
+        List<Long> ids = barbers.stream().map(Barber::getId).toList();
+        if (ids.isEmpty()) {
+            return Map.of();
         }
-        ZoneId zone = bookingProperties.timeZone();
-        LocalDate today = today();
-        for (int day = 0; day <= bookingProperties.maxDaysAhead(); day++) {
-            LocalDate date = today.plusDays(day);
-            List<LocalTime> starts = availabilityService.findAvailableStartTimes(
-                    barber.getId(), date, shortest, barber.getSlotStepMinutes());
-            if (!starts.isEmpty()) {
-                return date.atTime(starts.getFirst()).atZone(zone).toOffsetDateTime();
-            }
+        Map<Long, List<ServiceOffering>> services = serviceRepository.findAllByBarberIdInAndActiveTrue(ids).stream()
+                .collect(Collectors.groupingBy(service -> service.getBarber().getId()));
+        Map<Long, List<String>> photoKeys = new HashMap<>();
+        for (Object[] row : photoRepository.findKeysNewestFirst(ids)) {
+            photoKeys.computeIfAbsent((Long) row[0], key -> new ArrayList<>()).add((String) row[1]);
         }
-        return null;
+
+        // Next free time for the barber's shortest service.
+        Map<Long, Integer> shortest = new HashMap<>();
+        services.forEach((barberId, offered) -> offered.stream().map(ServiceOffering::getDurationMinutes)
+                .filter(Objects::nonNull).min(Comparator.naturalOrder())
+                .ifPresent(minutes -> shortest.put(barberId, minutes)));
+        Map<Long, OffsetDateTime> nextAvailable = availabilityService.nextAvailable(barbers, shortest);
+
+        Map<Long, BarberResponseDTO.Listing> listings = new HashMap<>();
+        for (Long id : ids) {
+            List<String> keys = photoKeys.getOrDefault(id, List.of());
+            // Free extras (e.g. a 0 € wash) would make every barber read "από 0 €".
+            BigDecimal fromPrice = services.getOrDefault(id, List.of()).stream().map(ServiceOffering::getPrice)
+                    .filter(price -> price.signum() > 0)
+                    .min(Comparator.naturalOrder()).orElse(null);
+            listings.put(id, new BarberResponseDTO.Listing(
+                    keys.isEmpty() ? null : keys.getFirst(), keys.size(), fromPrice, nextAvailable.get(id)));
+        }
+        return listings;
     }
 
     private LocalDate today() {
