@@ -5,6 +5,7 @@ import gr.barber.booking.model.Appointment;
 import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.List;
 
 /**
  * Published when an appointment changes. Carries plain values (not the entity) because
@@ -18,6 +19,7 @@ public record AppointmentEvent(
         String barberEmail,
         String barberName,
         String serviceName,
+        List<String> extraNames,
         BigDecimal price,
         ZonedDateTime startTime
 ) {
@@ -31,6 +33,7 @@ public record AppointmentEvent(
                 appointment.getBarber().getUser().getEmail(),
                 appointment.getBarber().getUser().getName(),
                 appointment.getServiceName(),
+                appointment.getExtras().stream().map(extra -> extra.getName()).toList(),
                 appointment.getPrice(),
                 appointment.getStartAt().atZone(zone)
         );

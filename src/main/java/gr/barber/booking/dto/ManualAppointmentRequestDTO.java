@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * A booking the barber enters for a phone or walk-in customer.
@@ -16,6 +17,8 @@ public record ManualAppointmentRequestDTO(
         @NotNull LocalDateTime startTime,
         @NotBlank @Size(max = 100) String customerName,
         @Size(max = 30) String customerPhone,
-        @Size(max = 500) String note
+        @Size(max = 500) String note,
+        // Extras on top of the main service, in the order chosen; null or empty for none.
+        @Size(max = 10) List<Long> extraIds
 ) {
 }

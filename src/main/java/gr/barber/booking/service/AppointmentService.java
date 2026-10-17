@@ -31,6 +31,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class AppointmentService {
@@ -66,17 +68,17 @@ public class AppointmentService {
     }
 
     @Transactional(readOnly = true)
-    public AvailabilityResponseDTO getAvailability(Long barberId, Long serviceId, LocalDate date) {
+    public AvailabilityResponseDTO getAvailability(Long barberId, Long serviceId, List<Long> extraIds, LocalDate date) {
 
         Barber barber = barberService.getApprovedById(barberId);
-        ServiceOffering service = getActiveService(barber, serviceId);
+        Selection selection = select(barber, serviceId, extraIds);
 
         List<String> startTimes = availabilityService
-                .findAvailableStartTimes(barber, date, service.getDurationMinutes()).stream()
+                .findAvailableStartTimes(barber, date, selection.durationMinutes()).stream()
                 .map(TIME_FORMAT::format)
                 .toList();
 
-        return new AvailabilityResponseDTO(barber.getId(), service.getId(), date, service.getDurationMinutes(), startTimes);
+        return new AvailabilityResponseDTO(barber.getId(), serviceId, date, selection.durationMinutes(), startTimes);
     }
 
     @Transactional
@@ -85,10 +87,10 @@ public class AppointmentService {
         User customer = userRepository.findByEmailForUpdate(customerEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Barber barber = barberService.getApprovedById(request.barberId());
-        ServiceOffering service = getActiveService(barber, request.serviceId());
+        Selection selection = select(barber, request.serviceId(), request.extraIds());
 
         ZoneId zone = zone();
-        int duration = service.getDurationMinutes();
+        int duration = selection.durationMinutes();
         Instant startAt = request.startTime().atZone(zone).toInstant();
         Instant endAt = startAt.plusSeconds(duration * 60L);
 
@@ -120,7 +122,8 @@ public class AppointmentService {
                 ? AppointmentStatus.CONFIRMED
                 : AppointmentStatus.PENDING;
 
-        Appointment appointment = new Appointment(customer, barber, service, startAt, endAt, status, request.note());
+        Appointment appointment = new Appointment(customer, barber, selection.main(), startAt, endAt, status, request.note());
+        appointment.addExtras(selection.extras());
 
         try {
             appointment = appointmentRepository.saveAndFlush(appointment);
@@ -144,13 +147,11 @@ public class AppointmentService {
     public AppointmentResponseDTO bookManually(String barberEmail, ManualAppointmentRequestDTO request) {
 
         Barber barber = barberService.getByEmail(barberEmail);
-        ServiceOffering service = serviceOfferingRepository.findByIdAndBarberId(request.serviceId(), barber.getId())
-                .filter(ServiceOffering::isActive)
-                .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
+        Selection selection = select(barber, request.serviceId(), request.extraIds());
 
         ZoneId zone = zone();
         Instant startAt = request.startTime().atZone(zone).toInstant();
-        Instant endAt = startAt.plusSeconds(service.getDurationMinutes() * 60L);
+        Instant endAt = startAt.plusSeconds(selection.durationMinutes() * 60L);
         Instant now = clock.instant();
 
         // A walk-in may be logged just after they sat down, but not long after.
@@ -164,8 +165,9 @@ public class AppointmentService {
             throw new ConflictException("OVERLAPS_APPOINTMENT", "This time overlaps another appointment");
         }
 
-        Appointment appointment = Appointment.manual(barber, service, startAt, endAt,
+        Appointment appointment = Appointment.manual(barber, selection.main(), startAt, endAt,
                 request.customerName().strip(), blankToNull(request.customerPhone()), blankToNull(request.note()));
+        appointment.addExtras(selection.extras());
         try {
             appointment = appointmentRepository.saveAndFlush(appointment);
         } catch (DataIntegrityViolationException e) {
@@ -263,10 +265,28 @@ public class AppointmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
     }
 
-    private ServiceOffering getActiveService(Barber barber, Long serviceId) {
-        return serviceOfferingRepository.findByIdAndBarberId(serviceId, barber.getId())
+    /** One main service plus any extras; the appointment lasts as long as all of them together. */
+    private record Selection(ServiceOffering main, List<ServiceOffering> extras) {
+        int durationMinutes() {
+            return main.getDurationMinutes() + extras.stream().mapToInt(ServiceOffering::getDurationMinutes).sum();
+        }
+    }
+
+    // Both must be the barber's own active services, of the right kind; extras keep the given order.
+    private Selection select(Barber barber, Long serviceId, List<Long> extraIds) {
+        ServiceOffering main = serviceOfferingRepository.findByIdAndBarberId(serviceId, barber.getId())
                 .filter(ServiceOffering::isActive)
+                .filter(ServiceOffering::isMain)
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
+
+        List<Long> ids = extraIds == null ? List.of() : extraIds;
+        Map<Long, ServiceOffering> available = serviceOfferingRepository.findAllById(ids).stream()
+                .filter(s -> s.getBarber().getId().equals(barber.getId()) && s.isActive() && !s.isMain())
+                .collect(Collectors.toMap(ServiceOffering::getId, s -> s));
+        if (available.size() != ids.size() || ids.stream().distinct().count() != ids.size()) {
+            throw new BadRequestException("INVALID_EXTRA", "One of the extras is not available");
+        }
+        return new Selection(main, ids.stream().map(available::get).toList());
     }
 
     private void requireActiveAndUpcoming(Appointment appointment) {

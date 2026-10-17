@@ -1,10 +1,13 @@
 package gr.barber.booking.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "appointments")
@@ -31,7 +34,7 @@ public class Appointment {
     @JoinColumn(name = "service_id", nullable = false)
     private ServiceOffering service;
 
-    // Snapshot of the service at booking time.
+    // Snapshot of the main service at booking time; price is the total including extras.
     @Column(nullable = false)
     private String serviceName;
 
@@ -52,6 +55,12 @@ public class Appointment {
     private CancelledBy cancelledBy;
 
     private String customerNote;
+
+    // Chosen on top of the main service; included in price and endAt.
+    @OneToMany(mappedBy = "appointment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position")
+    @BatchSize(size = 50)
+    private List<AppointmentExtra> extras = new ArrayList<>();
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -84,6 +93,18 @@ public class Appointment {
         appointment.guestName = guestName;
         appointment.guestPhone = guestPhone;
         return appointment;
+    }
+
+    /** Adds the extras (in order) and their prices to the total. */
+    public void addExtras(List<ServiceOffering> chosen) {
+        for (ServiceOffering extra : chosen) {
+            extras.add(new AppointmentExtra(this, extra, extras.size()));
+            price = price.add(extra.getPrice());
+        }
+    }
+
+    public List<AppointmentExtra> getExtras() {
+        return extras;
     }
 
     public boolean isManual() {
