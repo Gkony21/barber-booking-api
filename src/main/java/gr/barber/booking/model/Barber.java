@@ -9,6 +9,10 @@ import java.time.Instant;
 @Table(name = "barbers")
 public class Barber {
 
+    /** The choices a barber has for how far ahead customers can book: two weeks, a month, two months. */
+    public static final java.util.Set<Integer> ALLOWED_BOOKING_WINDOWS = java.util.Set.of(14, 30, 60);
+
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -51,6 +55,10 @@ public class Barber {
     // Appointments may start every this many minutes from the start of a shift (15 or 30).
     @Column(nullable = false)
     private int slotStepMinutes = 30;
+
+    // How many days ahead customers can book: 14, 30 or 60 (see ALLOWED_BOOKING_WINDOWS).
+    @Column(nullable = false)
+    private int bookingWindowDays = 14;
 
     // When false, new bookings stay PENDING until the barber confirms them.
     @Column(nullable = false)
@@ -161,6 +169,14 @@ public class Barber {
 
     public void setAvatarKey(String avatarKey) {
         this.avatarKey = avatarKey;
+    }
+
+    public int getBookingWindowDays() {
+        return bookingWindowDays;
+    }
+
+    public void setBookingWindowDays(int bookingWindowDays) {
+        this.bookingWindowDays = bookingWindowDays;
     }
 
     public int getSlotStepMinutes() {

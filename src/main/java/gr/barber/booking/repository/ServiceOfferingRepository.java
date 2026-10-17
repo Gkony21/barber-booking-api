@@ -1,5 +1,6 @@
 package gr.barber.booking.repository;
 
+import java.util.Collection;
 import gr.barber.booking.model.ServiceOffering;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -11,6 +12,8 @@ public interface ServiceOfferingRepository extends JpaRepository<ServiceOffering
     List<ServiceOffering> findAllByBarberIdOrderByName(Long barberId);
 
     List<ServiceOffering> findAllByBarberIdAndActiveTrueOrderByName(Long barberId);
+
+    List<ServiceOffering> findAllByBarberIdInAndActiveTrue(Collection<Long> barberIds);
 
     Optional<ServiceOffering> findByIdAndBarberId(Long id, Long barberId);
 }

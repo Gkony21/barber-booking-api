@@ -23,6 +23,7 @@ public record BarberResponseDTO(
         BarberStatus status,
         boolean autoConfirmBookings,
         int slotStepMinutes,
+        int bookingWindowDays,
         Long shopId,
         String shopName,
         // Filled in for the public listing and profile; null/0 elsewhere.
@@ -58,6 +59,7 @@ public record BarberResponseDTO(
                 barber.getStatus(),
                 barber.isAutoConfirmBookings(),
                 barber.getSlotStepMinutes(),
+                barber.getBookingWindowDays(),
                 shop != null ? shop.getId() : null,
                 shop != null ? shop.getName() : null,
                 MediaController.url(listing.coverKey()),

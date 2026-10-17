@@ -1,5 +1,6 @@
 package gr.barber.booking.repository;
 
+import java.util.Collection;
 import gr.barber.booking.model.Appointment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -20,6 +21,15 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             order by a.startAt
             """)
     List<Appointment> findActiveForBarberOverlapping(Long barberId, Instant from, Instant to);
+
+    @Query("""
+            select a from Appointment a
+            where a.barber.id in :barberIds
+              and a.status in (gr.barber.booking.model.AppointmentStatus.PENDING,
+                               gr.barber.booking.model.AppointmentStatus.CONFIRMED)
+              and a.startAt < :to and a.endAt > :from
+            """)
+    List<Appointment> findActiveForBarbersOverlapping(Collection<Long> barberIds, Instant from, Instant to);
 
     @Query("""
             select count(a) > 0 from Appointment a
