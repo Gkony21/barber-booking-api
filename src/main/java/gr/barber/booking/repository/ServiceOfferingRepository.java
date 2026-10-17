@@ -9,7 +9,7 @@ import java.util.Optional;
 
 public interface ServiceOfferingRepository extends JpaRepository<ServiceOffering, Long> {
 
-    List<ServiceOffering> findAllByBarberIdOrderByName(Long barberId);
+    List<ServiceOffering> findAllByBarberIdAndDeletedFalseOrderByName(Long barberId);
 
     List<ServiceOffering> findAllByBarberIdAndActiveTrueOrderByName(Long barberId);
 

@@ -31,6 +31,10 @@ public class ServiceOffering {
     @Column(nullable = false)
     private ServiceKind kind = ServiceKind.MAIN;
 
+    // Deleted by the barber: gone from every list, kept only for appointments that refer to it.
+    @Column(nullable = false)
+    private boolean deleted = false;
+
     // Deactivated instead of deleted so appointments can keep referencing it.
     @Column(nullable = false)
     private boolean active = true;
@@ -56,6 +60,16 @@ public class ServiceOffering {
 
     public void setKind(ServiceKind kind) {
         this.kind = kind;
+    }
+
+    /** Gone for good from the barber's and customers' lists; booked appointments keep their copy. */
+    public void delete() {
+        this.deleted = true;
+        this.active = false;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
     }
 
     public boolean isMain() {

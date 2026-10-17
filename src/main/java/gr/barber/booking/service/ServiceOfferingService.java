@@ -34,7 +34,7 @@ public class ServiceOfferingService {
     @Transactional(readOnly = true)
     public List<ServiceOfferingResponseDTO> getMyServices(String email) {
         Barber barber = barberService.getByEmail(email);
-        return serviceOfferingRepository.findAllByBarberIdOrderByName(barber.getId()).stream()
+        return serviceOfferingRepository.findAllByBarberIdAndDeletedFalseOrderByName(barber.getId()).stream()
                 .map(ServiceOfferingResponseDTO::from)
                 .toList();
     }
@@ -55,14 +55,21 @@ public class ServiceOfferingService {
         return ServiceOfferingResponseDTO.from(service);
     }
 
+    // Hidden from customers for now; the barber can show it again.
     @Transactional
-    public void deactivateService(String email, Long serviceId) {
+    public void hideService(String email, Long serviceId) {
         getOwnedService(email, serviceId).setActive(false);
+    }
+
+    @Transactional
+    public void deleteService(String email, Long serviceId) {
+        getOwnedService(email, serviceId).delete();
     }
 
     private ServiceOffering getOwnedService(String email, Long serviceId) {
         Barber barber = barberService.getByEmail(email);
         return serviceOfferingRepository.findByIdAndBarberId(serviceId, barber.getId())
+                .filter(service -> !service.isDeleted())
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
     }
 
