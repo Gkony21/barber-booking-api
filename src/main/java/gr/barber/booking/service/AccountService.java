@@ -71,7 +71,7 @@ public class AccountService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new BadRequestException("Wrong password");
+            throw new BadRequestException("WRONG_PASSWORD", "Wrong password");
         }
 
         for (Appointment appointment : appointmentRepository.findUpcomingActiveInvolving(user.getId(), clock.instant())) {

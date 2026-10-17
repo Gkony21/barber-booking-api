@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
@@ -17,6 +18,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.function.IntBinaryOperator;
 
 /**
  * Turns an upload into a clean JPEG. Decoding proves the file really is an image, and drawing
@@ -30,7 +32,7 @@ public class ImageProcessor {
 
     /** Scales down so the longest side is at most {@code maxSide}. */
     public byte[] photo(byte[] upload, int maxSide) {
-        BufferedImage source = decode(upload);
+        BufferedImage source = decode(upload, (width, height) -> Math.max(width, height), maxSide);
         double scale = Math.min(1.0, (double) maxSide / Math.max(source.getWidth(), source.getHeight()));
         int width = Math.max(1, (int) Math.round(source.getWidth() * scale));
         int height = Math.max(1, (int) Math.round(source.getHeight() * scale));
@@ -39,7 +41,7 @@ public class ImageProcessor {
 
     /** Crops the centre square and scales it to {@code side}×{@code side}. */
     public byte[] square(byte[] upload, int side) {
-        BufferedImage source = decode(upload);
+        BufferedImage source = decode(upload, Math::min, side);
         int crop = Math.min(source.getWidth(), source.getHeight());
         int x = (source.getWidth() - crop) / 2;
         int y = (source.getHeight() - crop) / 2;
@@ -47,19 +49,30 @@ public class ImageProcessor {
         return encode(draw(source, x, y, crop, crop, target, target));
     }
 
-    private BufferedImage decode(byte[] upload) {
+    /**
+     * Decodes the image, skipping pixels while reading when it is much bigger than needed: a 48 MP
+     * phone photo would take ~200 MB of memory at full size, enough to bring down a small server.
+     * The side that matters ({@code measure}) is still read at 1–2× {@code target}, so quality holds.
+     */
+    private BufferedImage decode(byte[] upload, IntBinaryOperator measure, int target) {
         try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(upload))) {
             Iterator<ImageReader> readers = input == null ? null : ImageIO.getImageReaders(input);
             if (readers == null || !readers.hasNext()) {
-                throw new BadRequestException("The file is not a JPEG or PNG image");
+                throw new BadRequestException("NOT_AN_IMAGE", "The file is not a JPEG or PNG image");
             }
             ImageReader reader = readers.next();
             try {
                 reader.setInput(input, true, true);
                 if (reader.getWidth(0) > MAX_SOURCE_SIDE || reader.getHeight(0) > MAX_SOURCE_SIDE) {
-                    throw new BadRequestException("The image is too large");
+                    throw new BadRequestException("IMAGE_TOO_LARGE", "The image is too large");
                 }
-                return reader.read(0);
+                int side = measure.applyAsInt(reader.getWidth(0), reader.getHeight(0));
+                ImageReadParam params = reader.getDefaultReadParam();
+                if (side >= 2 * target) {
+                    int step = (side + 2 * target - 1) / (2 * target);
+                    params.setSourceSubsampling(step, step, 0, 0);
+                }
+                return reader.read(0, params);
             } finally {
                 reader.dispose();
             }
@@ -67,7 +80,7 @@ public class ImageProcessor {
             if (e instanceof BadRequestException bad) {
                 throw bad;
             }
-            throw new BadRequestException("The file is not a JPEG or PNG image");
+            throw new BadRequestException("NOT_AN_IMAGE", "The file is not a JPEG or PNG image");
         }
     }
 

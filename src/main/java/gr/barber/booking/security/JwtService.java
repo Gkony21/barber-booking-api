@@ -1,6 +1,9 @@
 package gr.barber.booking.security;
 
+import gr.barber.booking.model.User;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -10,45 +13,36 @@ import java.util.Date;
 @Service
 public class JwtService {
 
+    static final String VERSION_CLAIM = "ver";
+
     @Value("${jwt.secret}")
     private String secret;
 
     @Value("${jwt.expiration}")
     private long expiration;
 
-    public String generateToken(String email, String role) {
+    // The role is included for the web app (which menu to show); the server reads it from the database.
+    public String generateToken(User user) {
         return Jwts.builder()
-                .subject(email)
-                .claim("role", role)
+                .subject(user.getEmail())
+                .claim("role", user.getRole().name())
+                .claim(VERSION_CLAIM, user.getTokenVersion())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getKey())
                 .compact();
     }
 
+    /** Checks the signature and expiry; throws JwtException if either fails. */
+    public Claims parse(String token) {
+        return Jwts.parser()
+                .verifyWith(getKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
     private SecretKey getKey() {
-        return io.jsonwebtoken.security.Keys.hmacShaKeyFor(secret.getBytes());
-    }
-
-    public String extractEmail(String token) {
-        return Jwts.parser()
-                .verifyWith(getKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
-    }
-
-    public String extractRole(String token) {
-        return Jwts.parser()
-                .verifyWith(getKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .get("role", String.class);
-    }
-
-    public boolean isTokenValid(String token, String email) {
-        return extractEmail(token).equals(email);
+        return Keys.hmacShaKeyFor(secret.getBytes());
     }
 }

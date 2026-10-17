@@ -37,6 +37,10 @@ public class User {
     // When the terms and privacy policy were accepted at sign-up; null for accounts created earlier.
     private java.time.Instant termsAcceptedAt;
 
+    // See V10: tokens with an older version are no longer accepted.
+    @Column(nullable = false)
+    private int tokenVersion = 0;
+
 
     public User() {
 
@@ -112,5 +116,14 @@ public class User {
 
     public void setTermsAcceptedAt(java.time.Instant termsAcceptedAt) {
         this.termsAcceptedAt = termsAcceptedAt;
+    }
+
+    public int getTokenVersion() {
+        return tokenVersion;
+    }
+
+    /** Signs the person out everywhere: tokens issued until now stop working. */
+    public void invalidateTokens() {
+        tokenVersion++;
     }
 }

@@ -55,7 +55,7 @@ public class TimeOffService {
     public TimeOffResponseDTO addTimeOff(String email, TimeOffRequestDTO request) {
 
         if (request.endDate().isBefore(request.startDate())) {
-            throw new BadRequestException("End date must not be before start date");
+            throw new BadRequestException("INVALID_DATE_RANGE", "End date must not be before start date");
         }
 
         Barber barber = barberService.getByEmail(email);

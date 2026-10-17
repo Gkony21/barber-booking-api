@@ -62,6 +62,10 @@ class AppointmentEmailTest extends IntegrationTest {
         assertThat(toBarber.getSubject()).isEqualTo("Νέο ραντεβού: Τρίτη 8 Ιανουαρίου 2030, 10:00");
         assertThat(toBarber.getText()).contains("Τηλέφωνο πελάτη: 6900000000");
         assertThat(toCustomer.getText()).doesNotContain("Τηλέφωνο πελάτη");
+
+        // Each side is sent to its own page: customers to their appointments, barbers to their schedule.
+        assertThat(toCustomer.getText()).contains("http://localhost:5173/appointments");
+        assertThat(toBarber.getText()).contains("http://localhost:5173/barber\n").doesNotContain("/appointments");
     }
 
     @Test

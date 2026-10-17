@@ -49,7 +49,7 @@ public class AuthService {
         }
 
         if (!Boolean.TRUE.equals(request.getAcceptTerms())) {
-            throw new BadRequestException("You need to accept the terms and privacy policy");
+            throw new BadRequestException("TERMS_NOT_ACCEPTED", "You need to accept the terms and privacy policy");
         }
 
         UserResponseDTO response = userService.saveUser(request, false);
@@ -78,7 +78,7 @@ public class AuthService {
             throw new EmailNotVerifiedException("Please verify your email before logging in");
         }
 
-        String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
+        String token = jwtService.generateToken(user);
 
         return new LoginResponseDTO(token);
     }

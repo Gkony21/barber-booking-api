@@ -62,12 +62,14 @@ public class PasswordResetService {
         Instant now = clock.instant();
         PasswordResetToken resetToken = tokenRepository.findByTokenHash(SecureTokens.hash(token))
                 .filter(t -> t.isUsable(now))
-                .orElseThrow(() -> new BadRequestException("Invalid or expired reset link"));
+                .orElseThrow(() -> new BadRequestException("INVALID_RESET_LINK", "Invalid or expired reset link"));
 
         User user = resetToken.getUser();
         passwordPolicy.check(newPassword, user.getEmail());
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        // Anyone still signed in with the old password (a lost phone, a shared computer) is signed out.
+        user.invalidateTokens();
         // Opening the link proves the person controls this address.
         user.setEmailVerified(true);
         resetToken.markUsed(now);

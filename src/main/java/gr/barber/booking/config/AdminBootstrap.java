@@ -14,8 +14,8 @@ import java.util.List;
 
 /**
  * Makes the accounts listed in app.admin-emails (ADMIN_EMAILS) admins on startup, so the first
- * admin can be set up on any server without database access. The account must be registered first;
- * the person logs in again afterwards to get an admin token.
+ * admin can be set up on any server without database access. The account must be registered and its
+ * email verified first; the person logs in again afterwards to get an admin token.
  */
 @Component
 public class AdminBootstrap implements ApplicationRunner {
@@ -39,10 +39,12 @@ public class AdminBootstrap implements ApplicationRunner {
                 continue;
             }
             userRepository.findByEmail(email).ifPresentOrElse(user -> {
-                if (user.getRole() != Role.ADMIN || !user.isEmailVerified()) {
+                // Only an account whose owner has opened the verification email: otherwise anyone
+                // who registered this address first, with their own password, would become admin.
+                if (!user.isEmailVerified()) {
+                    log.warn("ADMIN_EMAILS lists an account that has not verified its email yet; verify it, then restart");
+                } else if (user.getRole() != Role.ADMIN) {
                     user.setRole(Role.ADMIN);
-                    // The operator vouches for this address by configuring it.
-                    user.setEmailVerified(true);
                     userRepository.save(user);
                     log.info("Granted ADMIN role to user {}", user.getId());
                 }

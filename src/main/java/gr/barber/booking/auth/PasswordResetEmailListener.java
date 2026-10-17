@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
@@ -18,6 +19,7 @@ public class PasswordResetEmailListener {
         this.emailService = emailService;
     }
 
+    @Async
     @TransactionalEventListener
     public void onPasswordResetRequested(PasswordResetRequested event) {
         try {

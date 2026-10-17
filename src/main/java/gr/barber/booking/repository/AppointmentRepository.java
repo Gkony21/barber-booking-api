@@ -30,6 +30,15 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             """)
     boolean customerHasActiveOverlapping(Long customerId, Instant from, Instant to);
 
+    @Query("""
+            select count(a) from Appointment a
+            where a.customer.id = :customerId
+              and a.status in (gr.barber.booking.model.AppointmentStatus.PENDING,
+                               gr.barber.booking.model.AppointmentStatus.CONFIRMED)
+              and a.startAt > :now
+            """)
+    long countUpcomingActiveForCustomer(Long customerId, Instant now);
+
     List<Appointment> findAllByCustomerIdOrderByStartAtDesc(Long customerId);
 
     List<Appointment> findAllByBarberIdAndStartAtGreaterThanEqualAndStartAtLessThanOrderByStartAt(Long barberId,

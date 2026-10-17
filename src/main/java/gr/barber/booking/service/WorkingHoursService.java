@@ -66,7 +66,7 @@ public class WorkingHoursService {
 
         for (WorkingHoursDTO slot : slots) {
             if (!slot.startTime().isBefore(slot.endTime())) {
-                throw new BadRequestException("Start time must be before end time on " + slot.dayOfWeek());
+                throw new BadRequestException("INVALID_HOURS", "Start time must be before end time on " + slot.dayOfWeek());
             }
         }
 
@@ -77,7 +77,7 @@ public class WorkingHoursService {
             WorkingHoursDTO current = sorted.get(i);
             if (previous.dayOfWeek() == current.dayOfWeek()
                     && current.startTime().isBefore(previous.endTime())) {
-                throw new BadRequestException("Overlapping working hours on " + current.dayOfWeek());
+                throw new BadRequestException("OVERLAPPING_HOURS", "Overlapping working hours on " + current.dayOfWeek());
             }
         }
     }
