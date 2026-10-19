@@ -70,6 +70,9 @@ public class AppointmentService {
 
     @Transactional(readOnly = true)
     public AvailabilityResponseDTO getAvailability(Long barberId, Long serviceId, List<Long> extraIds, LocalDate date) {
+        if (serviceId == null) {
+            throw new BadRequestException("VALIDATION_FAILED", "Choose a service (serviceId) or a length (minutes)");
+        }
 
         Barber barber = barberService.getApprovedById(barberId);
         Selection selection = select(barber, serviceId, extraIds);
@@ -80,6 +83,19 @@ public class AppointmentService {
                 .toList();
 
         return new AvailabilityResponseDTO(barber.getId(), serviceId, date, selection.durationMinutes(), startTimes);
+    }
+
+    /** Free starts for an appointment of a given length, e.g. one being moved to another time. */
+    @Transactional(readOnly = true)
+    public AvailabilityResponseDTO getAvailabilityFor(Long barberId, int minutes, LocalDate date) {
+        if (minutes < 5 || minutes > 600) {
+            throw new BadRequestException("VALIDATION_FAILED", "Length must be between 5 and 600 minutes");
+        }
+        Barber barber = barberService.getApprovedById(barberId);
+        List<String> startTimes = availabilityService.findAvailableStartTimes(barber, date, minutes).stream()
+                .map(TIME_FORMAT::format)
+                .toList();
+        return new AvailabilityResponseDTO(barber.getId(), null, date, minutes, startTimes);
     }
 
     @Transactional

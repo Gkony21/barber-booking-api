@@ -30,10 +30,14 @@ public class BarberAppointmentController {
 
     @GetMapping("/{barberId}/availability")
     public AvailabilityResponseDTO getAvailability(@PathVariable Long barberId,
-                                                   @RequestParam Long serviceId,
+                                                   @RequestParam(required = false) Long serviceId,
                                                    @RequestParam(required = false) List<Long> extraIds,
+                                                   // Instead of services: an existing appointment's length, when moving it.
+                                                   @RequestParam(required = false) Integer minutes,
                                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return appointmentService.getAvailability(barberId, serviceId, extraIds, date);
+        return minutes != null
+                ? appointmentService.getAvailabilityFor(barberId, minutes, date)
+                : appointmentService.getAvailability(barberId, serviceId, extraIds, date);
     }
 
     @GetMapping("/me/appointments")

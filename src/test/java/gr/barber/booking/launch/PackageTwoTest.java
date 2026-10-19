@@ -71,8 +71,13 @@ class PackageTwoTest extends IntegrationTest {
         verify(mailSender, atLeastOnce()).send(mails.capture());
         assertThat(mails.getAllValues()).extracting(SimpleMailMessage::getSubject).contains("Αλλαγή ώρας ραντεβού: Τρίτη 8 Ιανουαρίου 2030, 10:15");
 
-        // The old time is free again.
+        // The old time is free again; free times can also be asked for by length, as the app does when moving.
         availability(TUESDAY).andExpect(jsonPath("$.startTimes", hasItem("10:45")));
+        mockMvc.perform(get("/barbers/{id}/availability", barber.getId()).param("minutes", "30").param("date", TUESDAY))
+                .andExpect(jsonPath("$.durationMinutes").value(30))
+                .andExpect(jsonPath("$.startTimes", not(hasItem("10:15"))));
+        mockMvc.perform(get("/barbers/{id}/availability", barber.getId()).param("date", TUESDAY))
+                .andExpect(status().isBadRequest());
         book(other, TUESDAY + "T11:00").andExpect(status().isCreated());
         reschedule(customer, id, TUESDAY + "T11:00").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SLOT_TAKEN"));
     }
