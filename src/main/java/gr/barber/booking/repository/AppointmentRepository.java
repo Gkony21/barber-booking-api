@@ -72,6 +72,23 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     @Query("update Appointment a set a.reminderDaySentAt = :now where a.id = :id and a.reminderDaySentAt is null")
     int claimDayReminder(Long id, Instant now);
 
+    @Query("""
+            select a from Appointment a
+            where a.status = gr.barber.booking.model.AppointmentStatus.PENDING and a.startAt <= :before
+            """)
+    List<Appointment> findPendingStartingBefore(Instant before);
+
+    @Query("""
+            select a from Appointment a
+            where a.status = gr.barber.booking.model.AppointmentStatus.PENDING
+              and a.createdAt <= :before and a.requestReminderSentAt is null
+            """)
+    List<Appointment> findPendingCreatedBefore(Instant before);
+
+    @Modifying
+    @Query("update Appointment a set a.requestReminderSentAt = :now where a.id = :id and a.requestReminderSentAt is null")
+    int claimRequestReminder(Long id, Instant now);
+
     @Modifying
     @Query("update Appointment a set a.reminderSoonSentAt = :now where a.id = :id and a.reminderSoonSentAt is null")
     int claimSoonReminder(Long id, Instant now);

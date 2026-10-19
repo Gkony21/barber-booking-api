@@ -24,6 +24,7 @@ public record BarberResponseDTO(
         boolean autoConfirmBookings,
         int slotStepMinutes,
         int bookingWindowDays,
+        int minNoticeMinutes,
         Long shopId,
         String shopName,
         // Where customers find a barber who works in a shop; the barber's own address otherwise applies.
@@ -63,6 +64,7 @@ public record BarberResponseDTO(
                 barber.isAutoConfirmBookings(),
                 barber.getSlotStepMinutes(),
                 barber.getBookingWindowDays(),
+                barber.getMinNoticeMinutes(),
                 shop != null ? shop.getId() : null,
                 shop != null ? shop.getName() : null,
                 shop != null ? shop.getAddress() : null,

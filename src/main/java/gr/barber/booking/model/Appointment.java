@@ -70,6 +70,8 @@ public class Appointment {
 
     private Instant reminderSoonSentAt;
 
+    private Instant requestReminderSentAt;
+
     protected Appointment() {
     }
 
@@ -126,6 +128,11 @@ public class Appointment {
 
     public void reject() {
         this.status = AppointmentStatus.REJECTED;
+    }
+
+    /** A request nobody answered in time. */
+    public void expire() {
+        this.status = AppointmentStatus.EXPIRED;
     }
 
     public void cancel(CancelledBy by) {

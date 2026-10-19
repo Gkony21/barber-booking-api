@@ -8,11 +8,15 @@ import gr.barber.booking.model.User;
 import gr.barber.booking.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.DefaultApplicationArguments;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
+import org.springframework.mail.SimpleMailMessage;
 
+import java.time.DayOfWeek;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -68,6 +72,15 @@ class AdminTest extends IntegrationTest {
                 .andExpect(jsonPath("$.status").value("APPROVED"));
 
         assertThat(barberRepository.findById(barber.getId()).orElseThrow().getStatus()).isEqualTo(BarberStatus.APPROVED);
+        // The barber hears about it by email.
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(mail.capture());
+        assertThat(mail.getValue().getTo()).containsExactly("nikos@test.gr");
+        assertThat(mail.getValue().getSubject()).contains("εγκρίθηκε");
+
+        // Listed for customers once they can be booked.
+        createService(barber, "Haircut", 30, "10.00");
+        addShift(barber, DayOfWeek.TUESDAY, "10:00", "14:00");
         mockMvc.perform(get("/barbers")).andExpect(jsonPath("$[0].name").value("Nikos"));
     }
 

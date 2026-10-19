@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import gr.barber.booking.dto.UserRequestDTO;
 import gr.barber.booking.dto.UserResponseDTO;
+import gr.barber.booking.service.PhoneNumbers;
 import gr.barber.booking.service.UserService;
 import gr.barber.booking.dto.LoginRequestDTO;
 import gr.barber.booking.dto.LoginResponseDTO;
@@ -51,6 +52,9 @@ public class AuthService {
         if (!Boolean.TRUE.equals(request.getAcceptTerms())) {
             throw new BadRequestException("TERMS_NOT_ACCEPTED", "You need to accept the terms and privacy policy");
         }
+
+        // Barbers need a way to reach customers (running late, a cancellation), and the admin barbers.
+        request.setPhoneNumber(PhoneNumbers.normalize(request.getPhoneNumber()));
 
         UserResponseDTO response = userService.saveUser(request, false);
 

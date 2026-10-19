@@ -21,6 +21,8 @@ public record BarberRequestDTO(
         // Public link, e.g. "giorgos"; null keeps the current one.
         @Size(max = 30) String slug,
         // 14, 30 or 60 days; null keeps the current setting (14 by default).
-        Integer bookingWindowDays
+        Integer bookingWindowDays,
+        // 30, 60 or 120 minutes; null keeps the current setting (60 by default).
+        Integer minNoticeMinutes
 ) {
 }

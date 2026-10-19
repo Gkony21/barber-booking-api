@@ -86,6 +86,10 @@ public class AppointmentService {
 
         User customer = userRepository.findByEmailForUpdate(customerEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (customer.getPhoneNumber() == null || customer.getPhoneNumber().isBlank()) {
+            // The barber must be able to reach whoever booked; older accounts may not have a number.
+            throw new BadRequestException("PHONE_REQUIRED", "Add a mobile number to your account before booking");
+        }
         Barber barber = barberService.getApprovedById(request.barberId());
         Selection selection = select(barber, request.serviceId(), request.extraIds());
 
@@ -96,6 +100,10 @@ public class AppointmentService {
 
         if (!startAt.isAfter(clock.instant())) {
             throw new BadRequestException("APPOINTMENT_IN_PAST", "The appointment must be in the future");
+        }
+        if (startAt.isBefore(clock.instant().plus(barber.bookingNotice()))) {
+            throw new BadRequestException("TOO_SOON",
+                    "This barber takes bookings at least " + barber.bookingNotice().toMinutes() + " minutes ahead");
         }
         if (!availabilityService.isWithinBookingWindow(barber, request.startTime().toLocalDate())) {
             throw new BadRequestException("TOO_FAR_AHEAD",

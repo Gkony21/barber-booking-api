@@ -145,6 +145,7 @@ public class AvailabilityService {
         }
         ZoneId zone = bookingProperties.timeZone();
         int step = barber.getSlotStepMinutes();
+        Instant earliest = now.plus(barber.bookingNotice());
         List<LocalTime> available = new ArrayList<>();
 
         for (WorkingHours shift : schedule.shiftsOn(date)) {
@@ -155,7 +156,7 @@ public class AvailabilityService {
                 Instant slotStart = date.atTime(start).atZone(zone).toInstant();
                 Instant slotEnd = slotStart.plusSeconds(durationMinutes * 60L);
 
-                if (slotStart.isAfter(now) && schedule.booked().stream().noneMatch(a -> overlaps(a, slotStart, slotEnd))) {
+                if (!slotStart.isBefore(earliest) && schedule.booked().stream().noneMatch(a -> overlaps(a, slotStart, slotEnd))) {
                     available.add(start);
                 }
 

@@ -11,6 +11,9 @@ import gr.barber.booking.model.BarberStatus;
 import gr.barber.booking.model.User;
 import gr.barber.booking.repository.BarberRepository;
 import gr.barber.booking.repository.UserRepository;
+import gr.barber.booking.notification.BarberApproved;
+import gr.barber.booking.notification.BarberSignedUp;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +26,16 @@ public class BarberService {
     private final UserRepository userRepository;
     private final SlugService slugService;
 
-    public BarberService(BarberRepository barberRepository, UserRepository userRepository, SlugService slugService) {
+    private final ApplicationEventPublisher eventPublisher;
+
+    public BarberService(BarberRepository barberRepository,
+                         UserRepository userRepository,
+                         SlugService slugService,
+                         ApplicationEventPublisher eventPublisher) {
         this.barberRepository = barberRepository;
         this.userRepository = userRepository;
         this.slugService = slugService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -43,7 +52,9 @@ public class BarberService {
         barber.setSlug(slugService.generate(user.getName(), null));
         applyProfile(barber, request);
 
-        return BarberResponseDTO.from(barberRepository.save(barber));
+        barber = barberRepository.save(barber);
+        eventPublisher.publishEvent(new BarberSignedUp(user.getName(), user.getEmail(), user.getPhoneNumber(), barber.getCity()));
+        return BarberResponseDTO.from(barber);
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +81,9 @@ public class BarberService {
     public AdminBarberResponseDTO updateStatus(Long id, BarberStatus status) {
         Barber barber = barberRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Barber not found"));
+        if (status == BarberStatus.APPROVED && barber.getStatus() != BarberStatus.APPROVED) {
+            eventPublisher.publishEvent(new BarberApproved(barber.getUser().getEmail()));
+        }
         barber.setStatus(status);
         return AdminBarberResponseDTO.from(barber);
     }
@@ -103,6 +117,12 @@ public class BarberService {
                 throw new BadRequestException("INVALID_BOOKING_WINDOW", "Bookings can open 14, 30 or 60 days ahead");
             }
             barber.setBookingWindowDays(request.bookingWindowDays());
+        }
+        if (request.minNoticeMinutes() != null) {
+            if (!Barber.ALLOWED_MIN_NOTICE.contains(request.minNoticeMinutes())) {
+                throw new BadRequestException("INVALID_MIN_NOTICE", "Bookings can be made 30, 60 or 120 minutes ahead");
+            }
+            barber.setMinNoticeMinutes(request.minNoticeMinutes());
         }
         if (request.slotStepMinutes() != null) {
             if (request.slotStepMinutes() != 15 && request.slotStepMinutes() != 30) {

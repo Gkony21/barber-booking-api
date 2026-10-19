@@ -9,6 +9,7 @@ import gr.barber.booking.model.ServiceOffering;
 import gr.barber.booking.repository.BarberPhotoRepository;
 import gr.barber.booking.repository.BarberRepository;
 import gr.barber.booking.repository.ServiceOfferingRepository;
+import gr.barber.booking.repository.WorkingHoursRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,8 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -35,6 +38,7 @@ public class BarberDirectoryService {
     private final BarberRepository barberRepository;
     private final BarberPhotoRepository photoRepository;
     private final ServiceOfferingRepository serviceRepository;
+    private final WorkingHoursRepository workingHoursRepository;
     private final BarberService barberService;
     private final AvailabilityService availabilityService;
     private final BookingProperties bookingProperties;
@@ -43,6 +47,7 @@ public class BarberDirectoryService {
     public BarberDirectoryService(BarberRepository barberRepository,
                                   BarberPhotoRepository photoRepository,
                                   ServiceOfferingRepository serviceRepository,
+                                  WorkingHoursRepository workingHoursRepository,
                                   BarberService barberService,
                                   AvailabilityService availabilityService,
                                   BookingProperties bookingProperties,
@@ -50,6 +55,7 @@ public class BarberDirectoryService {
         this.barberRepository = barberRepository;
         this.photoRepository = photoRepository;
         this.serviceRepository = serviceRepository;
+        this.workingHoursRepository = workingHoursRepository;
         this.barberService = barberService;
         this.availabilityService = availabilityService;
         this.bookingProperties = bookingProperties;
@@ -71,6 +77,9 @@ public class BarberDirectoryService {
         } else {
             barbers = barberRepository.findAllByStatus(BarberStatus.APPROVED);
         }
+        if (shopId == null) {
+            barbers = bookableOnly(barbers);
+        }
 
         LocalDate today = today();
         Map<Long, BarberResponseDTO.Listing> listings = listings(barbers);
@@ -81,6 +90,18 @@ public class BarberDirectoryService {
                 .sorted(Comparator.comparing(BarberResponseDTO::nextAvailable,
                         Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
+    }
+
+    // Customers browsing only see barbers they can book: with a main service and working hours.
+    // Their own link (and a shop's member list) still shows them.
+    private List<Barber> bookableOnly(List<Barber> barbers) {
+        List<Long> ids = barbers.stream().map(Barber::getId).toList();
+        if (ids.isEmpty()) {
+            return barbers;
+        }
+        Set<Long> withServices = new HashSet<>(serviceRepository.findBarberIdsWithMainServices(ids));
+        Set<Long> withHours = new HashSet<>(workingHoursRepository.findBarberIdsWithHours(ids));
+        return barbers.stream().filter(b -> withServices.contains(b.getId()) && withHours.contains(b.getId())).toList();
     }
 
     @Transactional(readOnly = true)
