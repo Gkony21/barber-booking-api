@@ -57,7 +57,14 @@ public class AvailabilityService {
         static final Schedule EMPTY = new Schedule(List.of(), List.of(), List.of());
 
         boolean isOff(LocalDate date) {
-            return timeOff.stream().anyMatch(t -> !date.isBefore(t.getStartDate()) && !date.isAfter(t.getEndDate()));
+            return timeOff.stream().anyMatch(t -> t.isWholeDays()
+                    && !date.isBefore(t.getStartDate()) && !date.isAfter(t.getEndDate()));
+        }
+
+        // A block of hours on that day (e.g. 12:00-14:00) overlaps start..end.
+        boolean isBlocked(LocalDate date, LocalTime start, LocalTime end) {
+            return timeOff.stream().anyMatch(t -> !t.isWholeDays() && t.getStartDate().equals(date)
+                    && t.getStartTime().isBefore(end) && t.getEndTime().isAfter(start));
         }
 
         List<WorkingHours> shiftsOn(LocalDate date) {
@@ -116,17 +123,17 @@ public class AvailabilityService {
     @Transactional(readOnly = true)
     public boolean fitsSchedule(Barber barber, LocalDate date, LocalTime start, int durationMinutes) {
 
-        if (!isWithinBookingWindow(barber, date) || timeOffRepository.isOff(barber.getId(), date)) {
+        LocalTime end = start.plusMinutes(durationMinutes);
+        if (!isWithinBookingWindow(barber, date) || !end.isAfter(start)) {
+            return false; // outside the window, or would run past midnight
+        }
+
+        Schedule schedule = load(List.of(barber.getId()), date, date).getOrDefault(barber.getId(), Schedule.EMPTY);
+        if (schedule.isOff(date) || schedule.isBlocked(date, start, end)) {
             return false;
         }
 
-        LocalTime end = start.plusMinutes(durationMinutes);
-        if (!end.isAfter(start)) {
-            return false; // would run past midnight
-        }
-
         int step = barber.getSlotStepMinutes();
-        Schedule schedule = new Schedule(workingHoursRepository.findAllByBarberId(barber.getId()), List.of(), List.of());
         // Starts must fall on the barber's step from the shift start, as offered to customers.
         return schedule.shiftsOn(date).stream()
                 .anyMatch(shift -> !start.isBefore(shift.getStartTime())
@@ -146,6 +153,7 @@ public class AvailabilityService {
         ZoneId zone = bookingProperties.timeZone();
         int step = barber.getSlotStepMinutes();
         Instant earliest = now.plus(barber.bookingNotice());
+        Duration buffer = barber.buffer();
         List<LocalTime> available = new ArrayList<>();
 
         for (WorkingHours shift : schedule.shiftsOn(date)) {
@@ -156,7 +164,10 @@ public class AvailabilityService {
                 Instant slotStart = date.atTime(start).atZone(zone).toInstant();
                 Instant slotEnd = slotStart.plusSeconds(durationMinutes * 60L);
 
-                if (!slotStart.isBefore(earliest) && schedule.booked().stream().noneMatch(a -> overlaps(a, slotStart, slotEnd))) {
+                LocalTime slotEndTime = start.plusMinutes(durationMinutes);
+                if (!slotStart.isBefore(earliest)
+                        && !schedule.isBlocked(date, start, slotEndTime)
+                        && schedule.booked().stream().noneMatch(a -> overlaps(a, slotStart, slotEnd, buffer))) {
                     available.add(start);
                 }
 
@@ -194,7 +205,8 @@ public class AvailabilityService {
         return LocalDate.now(clock.withZone(bookingProperties.timeZone()));
     }
 
-    private static boolean overlaps(Appointment appointment, Instant start, Instant end) {
-        return appointment.getStartAt().isBefore(end) && appointment.getEndAt().isAfter(start);
+    // With a buffer, each appointment keeps that many minutes free before and after it.
+    private static boolean overlaps(Appointment appointment, Instant start, Instant end, Duration buffer) {
+        return appointment.getStartAt().isBefore(end.plus(buffer)) && appointment.getEndAt().plus(buffer).isAfter(start);
     }
 }

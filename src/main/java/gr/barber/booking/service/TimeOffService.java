@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -58,9 +59,16 @@ public class TimeOffService {
             throw new BadRequestException("INVALID_DATE_RANGE", "End date must not be before start date");
         }
 
+        boolean block = request.startTime() != null || request.endTime() != null;
+        if (block && (request.startTime() == null || request.endTime() == null
+                || !request.startTime().isBefore(request.endTime()) || !request.startDate().equals(request.endDate()))) {
+            throw new BadRequestException("INVALID_BLOCK", "A block needs one day and a start before its end");
+        }
+
         Barber barber = barberService.getByEmail(email);
-        TimeOff timeOff = timeOffRepository.save(
-                new TimeOff(barber, request.startDate(), request.endDate(), request.reason()));
+        TimeOff timeOff = timeOffRepository.save(block
+                ? TimeOff.block(barber, request.startDate(), request.startTime(), request.endTime(), request.reason())
+                : new TimeOff(barber, request.startDate(), request.endDate(), request.reason()));
 
         return toResponse(timeOff);
     }
@@ -75,12 +83,15 @@ public class TimeOffService {
 
     private TimeOffResponseDTO toResponse(TimeOff timeOff) {
         ZoneId zone = bookingProperties.timeZone();
-        int active = appointmentRepository.findActiveForBarberOverlapping(
-                timeOff.getBarber().getId(),
-                timeOff.getStartDate().atStartOfDay(zone).toInstant(),
-                timeOff.getEndDate().plusDays(1).atStartOfDay(zone).toInstant()).size();
+        Instant from = timeOff.isWholeDays()
+                ? timeOff.getStartDate().atStartOfDay(zone).toInstant()
+                : timeOff.getStartDate().atTime(timeOff.getStartTime()).atZone(zone).toInstant();
+        Instant to = timeOff.isWholeDays()
+                ? timeOff.getEndDate().plusDays(1).atStartOfDay(zone).toInstant()
+                : timeOff.getEndDate().atTime(timeOff.getEndTime()).atZone(zone).toInstant();
+        int active = appointmentRepository.findActiveForBarberOverlapping(timeOff.getBarber().getId(), from, to).size();
 
         return new TimeOffResponseDTO(timeOff.getId(), timeOff.getStartDate(), timeOff.getEndDate(),
-                timeOff.getReason(), active);
+                timeOff.getReason(), timeOff.getStartTime(), timeOff.getEndTime(), active);
     }
 }

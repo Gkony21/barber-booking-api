@@ -23,6 +23,8 @@ public record BarberRequestDTO(
         // 14, 30 or 60 days; null keeps the current setting (14 by default).
         Integer bookingWindowDays,
         // 30, 60 or 120 minutes; null keeps the current setting (60 by default).
-        Integer minNoticeMinutes
+        Integer minNoticeMinutes,
+        // 0, 5, 10 or 15; null keeps the current setting (0 by default).
+        Integer bufferMinutes
 ) {
 }

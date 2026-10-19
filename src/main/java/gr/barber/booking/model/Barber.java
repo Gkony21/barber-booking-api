@@ -12,6 +12,9 @@ public class Barber {
     /** The choices a barber has for how far ahead customers can book: two weeks, a month, two months. */
     public static final java.util.Set<Integer> ALLOWED_BOOKING_WINDOWS = java.util.Set.of(14, 30, 60);
 
+    /** Minutes kept free after each appointment: the barber's choices. */
+    public static final java.util.Set<Integer> ALLOWED_BUFFERS = java.util.Set.of(0, 5, 10, 15);
+
     /** How long before an appointment customers must book it: the barber's choices. */
     public static final java.util.Set<Integer> ALLOWED_MIN_NOTICE = java.util.Set.of(30, 60, 120);
 
@@ -69,6 +72,10 @@ public class Barber {
     // How many days ahead customers can book: 14, 30 or 60 (see ALLOWED_BOOKING_WINDOWS).
     @Column(nullable = false)
     private int bookingWindowDays = 14;
+
+    // Kept free after each appointment for online bookings (0, 5, 10 or 15 minutes).
+    @Column(nullable = false)
+    private int bufferMinutes = 0;
 
     // Customers book at least this many minutes ahead (30, 60 or 120).
     @Column(nullable = false)
@@ -183,6 +190,18 @@ public class Barber {
 
     public void setAvatarKey(String avatarKey) {
         this.avatarKey = avatarKey;
+    }
+
+    public int getBufferMinutes() {
+        return bufferMinutes;
+    }
+
+    public void setBufferMinutes(int bufferMinutes) {
+        this.bufferMinutes = bufferMinutes;
+    }
+
+    public java.time.Duration buffer() {
+        return java.time.Duration.ofMinutes(bufferMinutes);
     }
 
     public int getMinNoticeMinutes() {
