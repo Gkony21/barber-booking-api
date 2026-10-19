@@ -118,6 +118,12 @@ public class BarberService {
             }
             barber.setBookingWindowDays(request.bookingWindowDays());
         }
+        if (request.bufferMinutes() != null) {
+            if (!Barber.ALLOWED_BUFFERS.contains(request.bufferMinutes())) {
+                throw new BadRequestException("INVALID_BUFFER", "The break between appointments can be 0, 5, 10 or 15 minutes");
+            }
+            barber.setBufferMinutes(request.bufferMinutes());
+        }
         if (request.minNoticeMinutes() != null) {
             if (!Barber.ALLOWED_MIN_NOTICE.contains(request.minNoticeMinutes())) {
                 throw new BadRequestException("INVALID_MIN_NOTICE", "Bookings can be made 30, 60 or 120 minutes ahead");

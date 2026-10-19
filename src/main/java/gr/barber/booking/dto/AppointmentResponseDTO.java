@@ -29,13 +29,19 @@ public record AppointmentResponseDTO(
         // Entered by the barber for a phone or walk-in customer without an account.
         boolean manual,
         CancelledBy cancelledBy,
-        String note
+        String note,
+        // For the barber: how many times this customer did not turn up (0 elsewhere).
+        int customerNoShows
 ) {
 
     public record Extra(String name, BigDecimal price, int durationMinutes) {
     }
 
     public static AppointmentResponseDTO from(Appointment appointment, ZoneId zone) {
+        return from(appointment, zone, 0);
+    }
+
+    public static AppointmentResponseDTO from(Appointment appointment, ZoneId zone, int customerNoShows) {
         return new AppointmentResponseDTO(
                 appointment.getId(),
                 appointment.getBarber().getId(),
@@ -55,7 +61,8 @@ public record AppointmentResponseDTO(
                 appointment.getStatus(),
                 appointment.isManual(),
                 appointment.getCancelledBy(),
-                appointment.getCustomerNote()
+                appointment.getCustomerNote(),
+                customerNoShows
         );
     }
 }

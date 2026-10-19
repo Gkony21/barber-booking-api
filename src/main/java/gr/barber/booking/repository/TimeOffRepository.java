@@ -22,11 +22,4 @@ public interface TimeOffRepository extends JpaRepository<TimeOff, Long> {
             """)
     List<TimeOff> findOverlapping(Collection<Long> barberIds, LocalDate from, LocalDate to);
 
-    boolean existsByBarberIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(Long barberId,
-                                                                                LocalDate date,
-                                                                                LocalDate sameDate);
-
-    default boolean isOff(Long barberId, LocalDate date) {
-        return existsByBarberIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(barberId, date, date);
-    }
 }

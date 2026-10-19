@@ -25,6 +25,7 @@ public record BarberResponseDTO(
         int slotStepMinutes,
         int bookingWindowDays,
         int minNoticeMinutes,
+        int bufferMinutes,
         Long shopId,
         String shopName,
         // Where customers find a barber who works in a shop; the barber's own address otherwise applies.
@@ -65,6 +66,7 @@ public record BarberResponseDTO(
                 barber.getSlotStepMinutes(),
                 barber.getBookingWindowDays(),
                 barber.getMinNoticeMinutes(),
+                barber.getBufferMinutes(),
                 shop != null ? shop.getId() : null,
                 shop != null ? shop.getName() : null,
                 shop != null ? shop.getAddress() : null,

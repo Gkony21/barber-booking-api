@@ -1,6 +1,7 @@
 package gr.barber.booking.notification;
 
 import gr.barber.booking.model.Appointment;
+import gr.barber.booking.model.AppointmentStatus;
 
 import java.math.BigDecimal;
 import java.time.ZoneId;
@@ -21,7 +22,9 @@ public record AppointmentEvent(
         String serviceName,
         List<String> extraNames,
         BigDecimal price,
-        ZonedDateTime startTime
+        ZonedDateTime startTime,
+        // Waiting for the barber's answer.
+        boolean pending
 ) {
 
     public static AppointmentEvent of(AppointmentEventType type, Appointment appointment, ZoneId zone) {
@@ -35,7 +38,8 @@ public record AppointmentEvent(
                 appointment.getServiceName(),
                 appointment.getExtras().stream().map(extra -> extra.getName()).toList(),
                 appointment.getPrice(),
-                appointment.getStartAt().atZone(zone)
+                appointment.getStartAt().atZone(zone),
+                appointment.getStatus() == AppointmentStatus.PENDING
         );
     }
 }

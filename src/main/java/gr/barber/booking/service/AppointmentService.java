@@ -28,6 +28,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -113,7 +114,9 @@ public class AppointmentService {
                 request.startTime().toLocalTime(), duration)) {
             throw new BadRequestException("BARBER_NOT_WORKING", "The barber is not working at this time");
         }
-        if (!appointmentRepository.findActiveForBarberOverlapping(barber.getId(), startAt, endAt).isEmpty()) {
+        // The barber's break between appointments counts as taken.
+        if (!appointmentRepository.findActiveForBarberOverlapping(barber.getId(),
+                startAt.minus(barber.buffer()), endAt.plus(barber.buffer())).isEmpty()) {
             throw new ConflictException("SLOT_TAKEN", "This time is no longer available");
         }
         if (appointmentRepository.customerHasActiveOverlapping(customer.getId(), startAt, endAt)) {
@@ -219,6 +222,64 @@ public class AppointmentService {
         return AppointmentResponseDTO.from(appointment, zone());
     }
 
+    /**
+     * Moves the customer's appointment to another time of the same barber, with the same services.
+     * Allowed while it could still be cancelled; a barber who approves by hand answers again.
+     */
+    @Transactional
+    public AppointmentResponseDTO rescheduleByCustomer(String customerEmail, Long appointmentId, LocalDateTime newStart) {
+
+        User customer = userRepository.findByEmailForUpdate(customerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Appointment appointment = appointmentRepository.findByIdAndCustomerId(appointmentId, customer.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+        requireActiveAndUpcoming(appointment);
+
+        Instant now = clock.instant();
+        if (appointment.getStatus() == AppointmentStatus.CONFIRMED
+                && now.isAfter(appointment.getStartAt().minus(bookingProperties.cancellationCutoff()))) {
+            throw new BadRequestException("CHANGE_TOO_LATE", "Appointments can be changed up to "
+                    + bookingProperties.cancellationCutoff().toHours() + " hours before they start");
+        }
+
+        Barber barber = appointment.getBarber();
+        ZoneId zone = zone();
+        Duration length = Duration.between(appointment.getStartAt(), appointment.getEndAt());
+        Instant startAt = newStart.atZone(zone).toInstant();
+        Instant endAt = startAt.plus(length);
+
+        if (startAt.isBefore(now.plus(barber.bookingNotice()))) {
+            throw new BadRequestException("TOO_SOON",
+                    "This barber takes bookings at least " + barber.bookingNotice().toMinutes() + " minutes ahead");
+        }
+        if (!availabilityService.isWithinBookingWindow(barber, newStart.toLocalDate())) {
+            throw new BadRequestException("TOO_FAR_AHEAD",
+                    "This barber takes bookings up to " + barber.getBookingWindowDays() + " days ahead");
+        }
+        if (!availabilityService.fitsSchedule(barber, newStart.toLocalDate(), newStart.toLocalTime(), (int) length.toMinutes())) {
+            throw new BadRequestException("BARBER_NOT_WORKING", "The barber is not working at this time");
+        }
+        boolean taken = appointmentRepository.findActiveForBarberOverlapping(barber.getId(),
+                        startAt.minus(barber.buffer()), endAt.plus(barber.buffer())).stream()
+                .anyMatch(other -> !other.getId().equals(appointment.getId()));
+        if (taken) {
+            throw new ConflictException("SLOT_TAKEN", "This time is no longer available");
+        }
+        if (appointmentRepository.customerHasOtherActiveOverlapping(customer.getId(), appointment.getId(), startAt, endAt)) {
+            throw new ConflictException("CUSTOMER_OVERLAP", "You already have an appointment at this time");
+        }
+
+        AppointmentStatus status = barber.isAutoConfirmBookings() ? AppointmentStatus.CONFIRMED : AppointmentStatus.PENDING;
+        appointment.moveTo(startAt, endAt, status);
+        try {
+            appointmentRepository.saveAndFlush(appointment);
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException("SLOT_TAKEN", "This time is no longer available");
+        }
+        publish(AppointmentEventType.RESCHEDULED_BY_CUSTOMER, appointment);
+        return AppointmentResponseDTO.from(appointment, zone);
+    }
+
     @Transactional(readOnly = true)
     public List<AppointmentResponseDTO> getBarberAppointments(String barberEmail, LocalDate from, LocalDate to) {
 
@@ -232,11 +293,20 @@ public class AppointmentService {
             throw new BadRequestException("INVALID_DATE_RANGE", "'to' must not be before 'from'");
         }
 
-        return appointmentRepository.findAllByBarberIdAndStartAtGreaterThanEqualAndStartAtLessThanOrderByStartAt(
-                        barber.getId(),
-                        start.atStartOfDay(zone).toInstant(),
-                        end.plusDays(1).atStartOfDay(zone).toInstant()).stream()
-                .map(a -> AppointmentResponseDTO.from(a, zone))
+        List<Appointment> appointments = appointmentRepository.findAllByBarberIdAndStartAtGreaterThanEqualAndStartAtLessThanOrderByStartAt(
+                barber.getId(),
+                start.atStartOfDay(zone).toInstant(),
+                end.plusDays(1).atStartOfDay(zone).toInstant());
+
+        // How often each customer did not turn up anywhere, so the barber can call to confirm.
+        List<Long> customerIds = appointments.stream()
+                .filter(a -> a.getCustomer() != null).map(a -> a.getCustomer().getId()).distinct().toList();
+        Map<Long, Long> noShows = customerIds.isEmpty() ? Map.of() : appointmentRepository.countNoShows(customerIds).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+
+        return appointments.stream()
+                .map(a -> AppointmentResponseDTO.from(a, zone,
+                        a.getCustomer() == null ? 0 : noShows.getOrDefault(a.getCustomer().getId(), 0L).intValue()))
                 .toList();
     }
 
@@ -255,6 +325,20 @@ public class AppointmentService {
         requirePendingAndUpcoming(appointment);
         appointment.reject();
         publish(AppointmentEventType.REJECTED_BY_BARBER, appointment);
+        return AppointmentResponseDTO.from(appointment, zone());
+    }
+
+    // Only once the appointment has started: before that the customer may still come.
+    @Transactional
+    public AppointmentResponseDTO markNoShow(String barberEmail, Long appointmentId) {
+        Appointment appointment = getBarberAppointment(barberEmail, appointmentId);
+        if (appointment.getStatus() != AppointmentStatus.CONFIRMED || appointment.isManual()) {
+            throw new BadRequestException("APPOINTMENT_NOT_ACTIVE", "Only confirmed online bookings can be marked");
+        }
+        if (appointment.getStartAt().isAfter(clock.instant())) {
+            throw new BadRequestException("NOT_STARTED_YET", "The appointment has not started yet");
+        }
+        appointment.markNoShow();
         return AppointmentResponseDTO.from(appointment, zone());
     }
 

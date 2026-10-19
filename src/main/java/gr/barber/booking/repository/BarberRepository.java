@@ -6,7 +6,9 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.text.Normalizer;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 public interface BarberRepository extends JpaRepository<Barber, Long> {
@@ -38,7 +40,22 @@ public interface BarberRepository extends JpaRepository<Barber, Long> {
     @Query("""
             select b from Barber b left join b.shop s
             where b.status = :status
-              and lower(coalesce(s.city, b.city)) = lower(:city)
+              and lower(function('translate', coalesce(s.city, b.city), :accented, :plain)) like concat('%', :city, '%')
             """)
-    List<Barber> findAllByStatusAndCity(BarberStatus status, String city);
+    List<Barber> findAllByStatusAndCityLike(BarberStatus status, String city, String accented, String plain);
+
+    String ACCENTED = "ΆΈΉΊΌΎΏΪΫάέήίόύώϊϋΐΰς";
+    String PLAIN = "ΑΕΗΙΟΥΩΙΥαεηιουωιυιυσ";
+
+    /**
+     * Barbers whose (shop's) city contains the search, ignoring accents and case: "αθηνα" and
+     * "Αθ" both find "Αθήνα".
+     */
+    default List<Barber> findAllByStatusAndCity(BarberStatus status, String city) {
+        String plain = Normalizer.normalize(city.strip(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.forLanguageTag("el"))
+                .replace('ς', 'σ');
+        return findAllByStatusAndCityLike(status, plain, ACCENTED, PLAIN);
+    }
 }

@@ -130,6 +130,23 @@ public class Appointment {
         this.status = AppointmentStatus.REJECTED;
     }
 
+    public void markNoShow() {
+        this.status = AppointmentStatus.NO_SHOW;
+    }
+
+    /**
+     * Moves the appointment to a new time; reminders start over. A barber who approves bookings by
+     * hand has to answer again.
+     */
+    public void moveTo(Instant newStart, Instant newEnd, AppointmentStatus newStatus) {
+        this.startAt = newStart;
+        this.endAt = newEnd;
+        this.status = newStatus;
+        this.reminderDaySentAt = null;
+        this.reminderSoonSentAt = null;
+        this.requestReminderSentAt = null;
+    }
+
     /** A request nobody answered in time. */
     public void expire() {
         this.status = AppointmentStatus.EXPIRED;

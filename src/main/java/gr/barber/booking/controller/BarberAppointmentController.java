@@ -61,6 +61,11 @@ public class BarberAppointmentController {
         return appointmentService.rejectByBarber(authentication.getName(), id);
     }
 
+    @PostMapping("/me/appointments/{id}/no-show")
+    public AppointmentResponseDTO markNoShow(@PathVariable Long id, Authentication authentication) {
+        return appointmentService.markNoShow(authentication.getName(), id);
+    }
+
     @PostMapping("/me/appointments/{id}/cancel")
     public AppointmentResponseDTO cancel(@PathVariable Long id, Authentication authentication) {
         return appointmentService.cancelByBarber(authentication.getName(), id);
