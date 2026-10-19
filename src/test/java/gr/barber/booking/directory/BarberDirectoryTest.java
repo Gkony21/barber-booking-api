@@ -57,7 +57,7 @@ class BarberDirectoryTest extends IntegrationTest {
     @Test
     void listShowsCoverStartingPriceAndNextFreeTimeSoonestFirst() throws Exception {
         mockMvc.perform(get("/barbers"))
-                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].name").value("Nikos"))
                 .andExpect(jsonPath("$[0].nextAvailable").value("2030-01-07T17:00:00+02:00"))
                 .andExpect(jsonPath("$[0].fromPrice").value(8.00))
@@ -66,8 +66,7 @@ class BarberDirectoryTest extends IntegrationTest {
                 .andExpect(jsonPath("$[1].name").value("Giorgos"))
                 .andExpect(jsonPath("$[1].nextAvailable").value("2030-01-08T10:00:00+02:00"))
                 .andExpect(jsonPath("$[1].coverUrl").doesNotExist())
-                .andExpect(jsonPath("$[2].name").value("New"))
-                .andExpect(jsonPath("$[2].nextAvailable").doesNotExist());
+                .andExpect(jsonPath("$[?(@.name == 'New')]").isEmpty());
     }
 
     @Test
@@ -113,8 +112,21 @@ class BarberDirectoryTest extends IntegrationTest {
         Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         statistics.clear();
 
-        mockMvc.perform(get("/barbers")).andExpect(jsonPath("$", hasSize(15)));
+        mockMvc.perform(get("/barbers")).andExpect(jsonPath("$", hasSize(14)));
 
-        assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(8);
+        assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(10);
+    }
+
+    // A barber without a main service or working hours cannot be booked, so browsing customers do
+    // not see them; their own link still opens their page.
+    @Test
+    void barbersWhoCannotBeBookedAreLeftOutOfTheList() throws Exception {
+        Barber noHours = createApprovedBarber(createUser("NoHours", "nohours@test.gr", Role.BARBER), true);
+        createService(noHours, "Haircut", 30, "10.00");
+
+        mockMvc.perform(get("/barbers"))
+                .andExpect(jsonPath("$[?(@.name == 'NoHours')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.name == 'New')]").isEmpty());
+        mockMvc.perform(get("/barbers/{id}", noHours.getId())).andExpect(jsonPath("$.name").value("NoHours"));
     }
 }

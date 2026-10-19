@@ -14,6 +14,9 @@ public interface WorkingHoursRepository extends JpaRepository<WorkingHours, Long
 
     List<WorkingHours> findAllByBarberIdIn(Collection<Long> barberIds);
 
+    @Query("select distinct w.barber.id from WorkingHours w where w.barber.id in :barberIds")
+    List<Long> findBarberIdsWithHours(Collection<Long> barberIds);
+
     @Modifying
     @Query("delete from WorkingHours w where w.barber.id = :barberId")
     void deleteAllByBarberId(Long barberId);

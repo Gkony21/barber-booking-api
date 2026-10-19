@@ -12,6 +12,16 @@ public class Barber {
     /** The choices a barber has for how far ahead customers can book: two weeks, a month, two months. */
     public static final java.util.Set<Integer> ALLOWED_BOOKING_WINDOWS = java.util.Set.of(14, 30, 60);
 
+    /** How long before an appointment customers must book it: the barber's choices. */
+    public static final java.util.Set<Integer> ALLOWED_MIN_NOTICE = java.util.Set.of(30, 60, 120);
+
+    /**
+     * Requests wait for the barber's answer and expire 2 hours before they start, so they can only
+     * be sent at least 3 hours ahead: the barber always has an hour or more to reply.
+     */
+    public static final java.time.Duration REQUEST_EXPIRY = java.time.Duration.ofHours(2);
+    private static final java.time.Duration MIN_REQUEST_NOTICE = REQUEST_EXPIRY.plusHours(1);
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -59,6 +69,10 @@ public class Barber {
     // How many days ahead customers can book: 14, 30 or 60 (see ALLOWED_BOOKING_WINDOWS).
     @Column(nullable = false)
     private int bookingWindowDays = 14;
+
+    // Customers book at least this many minutes ahead (30, 60 or 120).
+    @Column(nullable = false)
+    private int minNoticeMinutes = 60;
 
     // When false, new bookings stay PENDING until the barber confirms them.
     @Column(nullable = false)
@@ -169,6 +183,20 @@ public class Barber {
 
     public void setAvatarKey(String avatarKey) {
         this.avatarKey = avatarKey;
+    }
+
+    public int getMinNoticeMinutes() {
+        return minNoticeMinutes;
+    }
+
+    public void setMinNoticeMinutes(int minNoticeMinutes) {
+        this.minNoticeMinutes = minNoticeMinutes;
+    }
+
+    /** How far ahead a customer must book: the barber's notice, or longer when requests need an answer. */
+    public java.time.Duration bookingNotice() {
+        java.time.Duration notice = java.time.Duration.ofMinutes(minNoticeMinutes);
+        return autoConfirmBookings || notice.compareTo(MIN_REQUEST_NOTICE) >= 0 ? notice : MIN_REQUEST_NOTICE;
     }
 
     public int getBookingWindowDays() {

@@ -70,15 +70,16 @@ class AppointmentFlowTest extends IntegrationTest {
 
     @Test
     void availabilityCoversSplitShiftsAndSkipsThePast() throws Exception {
-        // 10:00 is "now", so today starts at 10:15; last morning slot is 13:30, last evening slot 20:30.
+        // 10:00 is "now" and customers book at least an hour ahead, so today starts at 11:00;
+        // last morning slot is 13:30, last evening slot 20:30.
         availability("2030-01-07")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.durationMinutes").value(30))
-                .andExpect(jsonPath("$.startTimes", hasSize(14 + 15)))
-                .andExpect(jsonPath("$.startTimes[0]").value("10:15"))
-                .andExpect(jsonPath("$.startTimes[13]").value("13:30"))
-                .andExpect(jsonPath("$.startTimes[14]").value("17:00"))
-                .andExpect(jsonPath("$.startTimes[28]").value("20:30"));
+                .andExpect(jsonPath("$.startTimes", hasSize(11 + 15)))
+                .andExpect(jsonPath("$.startTimes[0]").value("11:00"))
+                .andExpect(jsonPath("$.startTimes[10]").value("13:30"))
+                .andExpect(jsonPath("$.startTimes[11]").value("17:00"))
+                .andExpect(jsonPath("$.startTimes[25]").value("20:30"));
     }
 
     @Test

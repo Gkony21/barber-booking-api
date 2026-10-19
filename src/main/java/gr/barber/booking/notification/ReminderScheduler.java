@@ -12,13 +12,16 @@ import org.springframework.stereotype.Component;
 public class ReminderScheduler {
 
     private final AppointmentReminderService reminderService;
+    private final PendingRequestService pendingRequestService;
 
-    public ReminderScheduler(AppointmentReminderService reminderService) {
+    public ReminderScheduler(AppointmentReminderService reminderService, PendingRequestService pendingRequestService) {
         this.reminderService = reminderService;
+        this.pendingRequestService = pendingRequestService;
     }
 
     @Scheduled(fixedDelayString = "${app.reminders.interval:PT5M}", initialDelayString = "PT1M")
     public void sendDueReminders() {
+        pendingRequestService.process();
         reminderService.sendDueReminders();
     }
 }
