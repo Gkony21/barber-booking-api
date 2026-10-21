@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -83,5 +84,14 @@ class WebSecurityTest extends IntegrationTest {
                 .andExpect(status().is4xxClientError());
 
         assertThat(userRepository.findByEmail("maria@test.gr")).isPresent();
+    }
+
+    // The host checks this to know the app is up; it says nothing else about the system.
+    @Test
+    void healthCheckIsPublicAndBrief() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"status\":\"UP\"}", true));
+        mockMvc.perform(get("/actuator/env")).andExpect(status().is4xxClientError());
     }
 }
