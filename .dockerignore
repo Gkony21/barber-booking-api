@@ -1,0 +1,7 @@
+target
+.git
+.idea
+.env
+.local-backup
+.local-demo
+uploads
