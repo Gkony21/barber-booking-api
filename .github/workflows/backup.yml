@@ -1,0 +1,39 @@
+# Daily database backup: dumps the production database, encrypts it and stores it in Cloudflare R2.
+# Skipped until the repository secrets below are set. To restore: download the file, then
+#   gpg --decrypt fade-<date>.sql.gz.gpg | gunzip | psql "<database url>"
+# Keep about 30 days by adding a lifecycle rule on the bucket in Cloudflare.
+name: Backup
+
+on:
+  schedule:
+    - cron: "15 2 * * *" # every night, 04:15/05:15 in Athens
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    container: postgres:17 # pg_dump must be as new as the database
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.BACKUP_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - name: Dump, encrypt and upload
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$PASSPHRASE" ] || [ -z "$R2_BUCKET" ]; then
+            echo "Backup secrets are not set yet; skipping."
+            exit 0
+          fi
+          apt-get update -qq && apt-get install -qq -y gnupg awscli > /dev/null
+          file="fade-$(date -u +%Y-%m-%d).sql.gz.gpg"
+          pg_dump --no-owner --no-privileges "$DATABASE_URL" | gzip \
+            | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$PASSPHRASE" -o "$file"
+          aws s3 cp "$file" "s3://$R2_BUCKET/$file" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          echo "Stored $file ($(du -h "$file" | cut -f1))"

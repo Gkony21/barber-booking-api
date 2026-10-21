@@ -1,6 +1,7 @@
 package gr.barber.booking.media;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
@@ -13,7 +14,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+/** Photos in a folder on this machine; the default for development (app.storage.type=local). */
 @Component
+@ConditionalOnProperty(value = "app.storage.type", havingValue = "local", matchIfMissing = true)
 public class LocalDiskImageStorage implements ImageStorage {
 
     // Keys are generated here, so anything else (e.g. "../") is refused before touching the disk.
