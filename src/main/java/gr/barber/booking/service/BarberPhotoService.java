@@ -24,6 +24,8 @@ public class BarberPhotoService {
     public static final int MAX_PHOTOS = 20;
     private static final int PHOTO_MAX_SIDE = 1600;
     private static final int AVATAR_SIDE = 512;
+    private static final int COVER_WIDTH = 1600;
+    private static final int COVER_HEIGHT = 900;
 
     private final BarberPhotoRepository photoRepository;
     private final BarberService barberService;
@@ -46,6 +48,24 @@ public class BarberPhotoService {
         String key = storage.save(imageProcessor.square(bytes(file), AVATAR_SIDE));
         deleteFileAfterCommit(barber.getAvatarKey());
         barber.setAvatarKey(key);
+        return BarberResponseDTO.from(barber);
+    }
+
+    // Wide, like the top of the barber's page: 16:9, at most 1600×900.
+    @Transactional
+    public BarberResponseDTO setCover(String email, MultipartFile file) {
+        Barber barber = barberService.getByEmail(email);
+        String key = storage.save(imageProcessor.cover(bytes(file), COVER_WIDTH, COVER_HEIGHT));
+        deleteFileAfterCommit(barber.getCoverKey());
+        barber.setCoverKey(key);
+        return BarberResponseDTO.from(barber);
+    }
+
+    @Transactional
+    public BarberResponseDTO removeCover(String email) {
+        Barber barber = barberService.getByEmail(email);
+        deleteFileAfterCommit(barber.getCoverKey());
+        barber.setCoverKey(null);
         return BarberResponseDTO.from(barber);
     }
 

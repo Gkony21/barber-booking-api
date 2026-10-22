@@ -39,6 +39,19 @@ public class ImageProcessor {
         return encode(draw(source, 0, 0, source.getWidth(), source.getHeight(), width, height));
     }
 
+    /** Crops the centre to {@code width}:{@code height} and scales it down to at most that size. */
+    public byte[] cover(byte[] upload, int width, int height) {
+        BufferedImage source = decode(upload, (w, h) -> Math.min(w, h * width / height), width);
+        double ratio = (double) width / height;
+        int cropWidth = Math.min(source.getWidth(), (int) Math.round(source.getHeight() * ratio));
+        int cropHeight = Math.min(source.getHeight(), (int) Math.round(cropWidth / ratio));
+        int x = (source.getWidth() - cropWidth) / 2;
+        int y = (source.getHeight() - cropHeight) / 2;
+        int targetWidth = Math.min(width, cropWidth);
+        int targetHeight = Math.max(1, (int) Math.round(targetWidth / ratio));
+        return encode(draw(source, x, y, cropWidth, cropHeight, targetWidth, targetHeight));
+    }
+
     /** Crops the centre square and scales it to {@code side}×{@code side}. */
     public byte[] square(byte[] upload, int side) {
         BufferedImage source = decode(upload, Math::min, side);

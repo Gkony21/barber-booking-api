@@ -155,6 +155,46 @@ class PackageTwoTest extends IntegrationTest {
                 .andExpect(jsonPath("$[1].customerNoShows").value(1));
     }
 
+    // ---- days and the barber's own free times ----
+
+    // The customer sees which days are closed (no hours, a day off) or already full.
+    @Test
+    void daysAreMarkedOpenFullOrClosed() throws Exception {
+        timeOff("{\"startDate\":\"2030-01-15\",\"endDate\":\"2030-01-15\"}").andExpect(status().isCreated());
+        addShift(barber, DayOfWeek.WEDNESDAY, "10:00", "10:30");
+        book(customer, "2030-01-09T10:00").andExpect(status().isCreated()); // fills Wednesday
+
+        mockMvc.perform(get("/barbers/{id}/days", barber.getId())
+                        .param("serviceId", haircut.getId().toString())
+                        .param("from", "2030-01-07").param("to", "2030-01-15"))
+                .andExpect(jsonPath("$", hasSize(9)))
+                .andExpect(jsonPath("$[0].status").value("CLOSED")) // Monday: no hours
+                .andExpect(jsonPath("$[1].status").value("OPEN"))   // Tuesday
+                .andExpect(jsonPath("$[2].status").value("FULL"))   // Wednesday, booked
+                .andExpect(jsonPath("$[8].status").value("CLOSED")); // Tuesday 15th, day off
+
+        mockMvc.perform(get("/barbers/{id}/days", barber.getId())
+                        .param("minutes", "30").param("from", "2030-01-07").param("to", "2030-03-31"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // Entering a booking by hand, the barber picks from free quarter hours within working hours.
+    @Test
+    void barbersSeeTheirOwnFreeQuarterHours() throws Exception {
+        book(customer, TUESDAY + "T10:30").andExpect(status().isCreated());
+
+        mockMvc.perform(get("/barbers/me/availability").param("minutes", "30").param("date", TUESDAY)
+                        .header("Authorization", bearer(barberUser)))
+                .andExpect(jsonPath("$.startTimes[0]").value("10:00"))
+                .andExpect(jsonPath("$.startTimes", not(hasItem("10:15"))))
+                .andExpect(jsonPath("$.startTimes", not(hasItem("10:45"))))
+                .andExpect(jsonPath("$.startTimes", hasItem("11:00")))
+                .andExpect(jsonPath("$.startTimes[-1:]").value(hasItem("17:30")));
+        mockMvc.perform(get("/barbers/me/availability").param("minutes", "30").param("date", TUESDAY)
+                        .header("Authorization", bearer(customer)))
+                .andExpect(status().isForbidden());
+    }
+
     // ---- city search ----
 
     @Test

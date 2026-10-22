@@ -50,6 +50,8 @@ class BarberDirectoryTest extends IntegrationTest {
         addShift(tonight, DayOfWeek.MONDAY, "17:00", "21:00");
         photoRepository.save(new BarberPhoto(tonight, "11111111-1111-1111-1111-111111111111.jpg"));
         photoRepository.save(new BarberPhoto(tonight, "22222222-2222-2222-2222-222222222222.jpg"));
+        tonight.setCoverKey("33333333-3333-3333-3333-333333333333.jpg");
+        barberRepository.save(tonight);
 
         createApprovedBarber(createUser("New", "new@test.gr", Role.BARBER), true); // no services yet
     }
@@ -62,7 +64,8 @@ class BarberDirectoryTest extends IntegrationTest {
                 .andExpect(jsonPath("$[0].nextAvailable").value("2030-01-07T17:00:00+02:00"))
                 .andExpect(jsonPath("$[0].fromPrice").value(8.00))
                 .andExpect(jsonPath("$[0].photoCount").value(2))
-                .andExpect(jsonPath("$[0].coverUrl").value("/media/22222222-2222-2222-2222-222222222222.jpg"))
+                // The barber's own cover, not the newest work photo.
+                .andExpect(jsonPath("$[0].coverUrl").value("/media/33333333-3333-3333-3333-333333333333.jpg"))
                 .andExpect(jsonPath("$[1].name").value("Giorgos"))
                 .andExpect(jsonPath("$[1].nextAvailable").value("2030-01-08T10:00:00+02:00"))
                 .andExpect(jsonPath("$[1].coverUrl").doesNotExist())

@@ -39,8 +39,8 @@ public record BarberResponseDTO(
 ) {
 
     /** What customers see on a barber's card besides the profile itself. */
-    public record Listing(String coverKey, long photoCount, BigDecimal fromPrice, OffsetDateTime nextAvailable) {
-        public static final Listing NONE = new Listing(null, 0, null, null);
+    public record Listing(long photoCount, BigDecimal fromPrice, OffsetDateTime nextAvailable) {
+        public static final Listing NONE = new Listing(0, null, null);
     }
 
     public static BarberResponseDTO from(Barber barber) {
@@ -71,7 +71,8 @@ public record BarberResponseDTO(
                 shop != null ? shop.getName() : null,
                 shop != null ? shop.getAddress() : null,
                 shop != null ? shop.getCity() : null,
-                MediaController.url(listing.coverKey()),
+                // The barber's own cover; null means the app shows its default design.
+                MediaController.url(barber.getCoverKey()),
                 listing.photoCount(),
                 listing.fromPrice(),
                 listing.nextAvailable()
