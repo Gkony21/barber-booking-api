@@ -46,7 +46,7 @@ class BarberDirectoryTest extends IntegrationTest {
         tonight = createApprovedBarber(createUser("Nikos", "nikos@test.gr", Role.BARBER), true);
         createService(tonight, "Haircut", 30, "12.00");
         createService(tonight, "Beard", 20, "8.00");
-        createService(tonight, "Wash", 10, "0.00"); // free extras do not set the starting price
+        createService(tonight, "Wash", 10, "0.00"); // the card shows the usual service, not the cheapest
         addShift(tonight, DayOfWeek.MONDAY, "17:00", "21:00");
         photoRepository.save(new BarberPhoto(tonight, "11111111-1111-1111-1111-111111111111.jpg"));
         photoRepository.save(new BarberPhoto(tonight, "22222222-2222-2222-2222-222222222222.jpg"));
@@ -57,12 +57,13 @@ class BarberDirectoryTest extends IntegrationTest {
     }
 
     @Test
-    void listShowsCoverStartingPriceAndNextFreeTimeSoonestFirst() throws Exception {
+    void listShowsCoverMainServiceAndNextFreeTimeSoonestFirst() throws Exception {
         mockMvc.perform(get("/barbers"))
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].name").value("Nikos"))
                 .andExpect(jsonPath("$[0].nextAvailable").value("2030-01-07T17:00:00+02:00"))
-                .andExpect(jsonPath("$[0].fromPrice").value(8.00))
+                .andExpect(jsonPath("$[0].featuredServiceName").value("Haircut"))
+                .andExpect(jsonPath("$[0].featuredPrice").value(12.00))
                 .andExpect(jsonPath("$[0].photoCount").value(2))
                 // The barber's own cover, not the newest work photo.
                 .andExpect(jsonPath("$[0].coverUrl").value("/media/33333333-3333-3333-3333-333333333333.jpg"))

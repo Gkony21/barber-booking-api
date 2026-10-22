@@ -3,6 +3,10 @@ package gr.barber.booking.model;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 
 @Entity
 @Table(name = "service_offerings")
@@ -39,6 +43,10 @@ public class ServiceOffering {
     @Column(nullable = false)
     private boolean active = true;
 
+    // Chosen by the barber to show on their card; see headline().
+    @Column(nullable = false)
+    private boolean featured = false;
+
     protected ServiceOffering() {
     }
 
@@ -74,6 +82,24 @@ public class ServiceOffering {
 
     public boolean isMain() {
         return kind == ServiceKind.MAIN;
+    }
+
+    public boolean isFeatured() {
+        return featured;
+    }
+
+    public void setFeatured(boolean featured) {
+        this.featured = featured;
+    }
+
+    /**
+     * The service a barber's card shows with its price: the one they chose, or else their first main
+     * service (usually the plain haircut). Hidden, deleted and extra services never count.
+     */
+    public static Optional<ServiceOffering> headline(Collection<ServiceOffering> services) {
+        List<ServiceOffering> offered = services.stream().filter(s -> s.isActive() && s.isMain()).toList();
+        return offered.stream().filter(ServiceOffering::isFeatured).findFirst()
+                .or(() -> offered.stream().min(Comparator.comparing(ServiceOffering::getId)));
     }
 
     public String getName() {

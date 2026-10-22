@@ -12,10 +12,16 @@ public record ServiceOfferingResponseDTO(
         Integer durationMinutes,
         BigDecimal price,
         ServiceKind kind,
-        boolean active
+        boolean active,
+        // Shown on the barber's card in the list (chosen, or the first main service by default).
+        boolean featured
 ) {
 
     public static ServiceOfferingResponseDTO from(ServiceOffering service) {
+        return from(service, false);
+    }
+
+    public static ServiceOfferingResponseDTO from(ServiceOffering service, boolean featured) {
         return new ServiceOfferingResponseDTO(
                 service.getId(),
                 service.getName(),
@@ -23,7 +29,8 @@ public record ServiceOfferingResponseDTO(
                 service.getDurationMinutes(),
                 service.getPrice(),
                 service.getKind(),
-                service.isActive()
+                service.isActive(),
+                featured
         );
     }
 }

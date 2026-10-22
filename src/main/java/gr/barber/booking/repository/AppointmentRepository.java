@@ -45,13 +45,13 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             where a.customer.id = :customerId
               and a.status in (gr.barber.booking.model.AppointmentStatus.PENDING,
                                gr.barber.booking.model.AppointmentStatus.CONFIRMED)
-              and a.startAt > :now
+              and a.startAt > :now and a.replaces is null
             """)
     long countUpcomingActiveForCustomer(Long customerId, Instant now);
 
     @Query("""
-            select count(a) > 0 from Appointment a
-            where a.customer.id = :customerId and a.id <> :exceptId
+            select count(a) > 0 from Appointment a left join a.replaces r
+            where a.customer.id = :customerId and a.id <> :exceptId and (r is null or r.id <> :exceptId)
               and a.status in (gr.barber.booking.model.AppointmentStatus.PENDING,
                                gr.barber.booking.model.AppointmentStatus.CONFIRMED)
               and a.startAt < :to and a.endAt > :from
@@ -89,11 +89,17 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     @Query("update Appointment a set a.reminderDaySentAt = :now where a.id = :id and a.reminderDaySentAt is null")
     int claimDayReminder(Long id, Instant now);
 
+    // A change also closes before the appointment it would move, so the customer knows which time holds.
     @Query("""
-            select a from Appointment a
-            where a.status = gr.barber.booking.model.AppointmentStatus.PENDING and a.startAt <= :before
+            select a from Appointment a left join a.replaces r
+            where a.status = gr.barber.booking.model.AppointmentStatus.PENDING
+              and (a.startAt <= :before or r.startAt <= :before)
             """)
     List<Appointment> findPendingStartingBefore(Instant before);
+
+    Optional<Appointment> findByReplacesId(Long originalId);
+
+    List<Appointment> findAllByReplacesIdIn(Collection<Long> originalIds);
 
     @Query("""
             select a from Appointment a

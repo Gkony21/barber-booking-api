@@ -24,7 +24,9 @@ public record AppointmentEvent(
         BigDecimal price,
         ZonedDateTime startTime,
         // Waiting for the barber's answer.
-        boolean pending
+        boolean pending,
+        // For a change of time: the confirmed time it would replace (startTime is the new one).
+        ZonedDateTime originalStartTime
 ) {
 
     public static AppointmentEvent of(AppointmentEventType type, Appointment appointment, ZoneId zone) {
@@ -39,7 +41,8 @@ public record AppointmentEvent(
                 appointment.getExtras().stream().map(extra -> extra.getName()).toList(),
                 appointment.getPrice(),
                 appointment.getStartAt().atZone(zone),
-                appointment.getStatus() == AppointmentStatus.PENDING
+                appointment.getStatus() == AppointmentStatus.PENDING,
+                appointment.isChange() ? appointment.getReplaces().getStartAt().atZone(zone) : null
         );
     }
 }

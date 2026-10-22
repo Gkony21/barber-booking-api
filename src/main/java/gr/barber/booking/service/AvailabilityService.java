@@ -58,6 +58,12 @@ public class AvailabilityService {
 
         static final Schedule EMPTY = new Schedule(List.of(), List.of(), List.of());
 
+        // As if those appointments were not booked, e.g. the customer's own one that is being moved.
+        Schedule without(Collection<Long> appointmentIds) {
+            return appointmentIds.isEmpty() ? this : new Schedule(shifts, timeOff,
+                    booked.stream().filter(a -> !appointmentIds.contains(a.getId())).toList());
+        }
+
         boolean isOff(LocalDate date) {
             return timeOff.stream().anyMatch(t -> t.isWholeDays()
                     && !date.isBefore(t.getStartDate()) && !date.isAfter(t.getEndDate()));
@@ -79,11 +85,18 @@ public class AvailabilityService {
 
     @Transactional(readOnly = true)
     public List<LocalTime> findAvailableStartTimes(Barber barber, LocalDate date, int durationMinutes) {
+        return findAvailableStartTimes(barber, date, durationMinutes, List.of());
+    }
+
+    /** Free starts, not counting the given appointments as taken (e.g. one being moved). */
+    @Transactional(readOnly = true)
+    public List<LocalTime> findAvailableStartTimes(Barber barber, LocalDate date, int durationMinutes,
+                                                   Collection<Long> ignoring) {
         if (!isWithinBookingWindow(barber, date)) {
             return List.of();
         }
         Schedule schedule = load(List.of(barber.getId()), date, date).getOrDefault(barber.getId(), Schedule.EMPTY);
-        return startTimes(barber, date, durationMinutes, schedule, clock.instant());
+        return startTimes(barber, date, durationMinutes, schedule.without(ignoring), clock.instant());
     }
 
     /**
@@ -123,8 +136,10 @@ public class AvailabilityService {
      * customer can see at a glance which days to pick. All days are worked out from one load.
      */
     @Transactional(readOnly = true)
-    public Map<LocalDate, DayStatus> dayStatuses(Barber barber, LocalDate from, LocalDate to, int durationMinutes) {
-        Schedule schedule = load(List.of(barber.getId()), from, to).getOrDefault(barber.getId(), Schedule.EMPTY);
+    public Map<LocalDate, DayStatus> dayStatuses(Barber barber, LocalDate from, LocalDate to, int durationMinutes,
+                                                 Collection<Long> ignoring) {
+        Schedule schedule = load(List.of(barber.getId()), from, to).getOrDefault(barber.getId(), Schedule.EMPTY)
+                .without(ignoring);
         Instant now = clock.instant();
         Map<LocalDate, DayStatus> statuses = new LinkedHashMap<>();
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {

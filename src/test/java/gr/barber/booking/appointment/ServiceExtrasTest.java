@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.time.DayOfWeek;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
@@ -99,12 +100,42 @@ class ServiceExtrasTest extends IntegrationTest {
         book(TUESDAY + "T10:00", haircut.getId(), othersExtra.getId()).andExpect(status().isBadRequest());
     }
 
-    // Extras would make every barber read "από 3 €" and their short lengths would find gaps no one can book.
+    // An extra is never the service on the card, even if it was added first.
     @Test
     void listingUsesMainServicesOnly() throws Exception {
         extra(createService(barber, "Μασάζ", 10, "3.00"));
 
-        mockMvc.perform(get("/barbers/{id}", barber.getId())).andExpect(jsonPath("$.fromPrice").value(12.00));
+        mockMvc.perform(get("/barbers/{id}", barber.getId()))
+                .andExpect(jsonPath("$.featuredServiceName").value(haircut.getName()))
+                .andExpect(jsonPath("$.featuredPrice").value(12.00));
+    }
+
+    // By default the first main service (usually the plain haircut), not the cheapest, e.g. a kids' cut.
+    @Test
+    void barbersChooseTheServiceOnTheirCard() throws Exception {
+        ServiceOffering beard = createService(barber, "Κούρεμα + μούσι", 40, "15.00");
+        createService(barber, "Παιδικό", 30, "8.00");
+        mockMvc.perform(get("/barbers/{id}", barber.getId())).andExpect(jsonPath("$.featuredServiceName").value("Κούρεμα"));
+
+        feature(beard.getId()).andExpect(status().isNoContent());
+        mockMvc.perform(get("/barbers/{id}", barber.getId()))
+                .andExpect(jsonPath("$.featuredServiceName").value("Κούρεμα + μούσι"))
+                .andExpect(jsonPath("$.featuredPrice").value(15.00));
+        mockMvc.perform(get("/barbers/{id}/services", barber.getId()))
+                .andExpect(jsonPath("$[?(@.featured == true)].name").value(contains("Κούρεμα + μούσι")));
+
+        feature(haircut.getId()).andExpect(status().isNoContent()); // replaces the earlier choice
+        mockMvc.perform(get("/barbers/me/services").header("Authorization", bearer(barberUser)))
+                .andExpect(jsonPath("$[?(@.featured == true)].name").value(contains("Κούρεμα")));
+        feature(wash.getId()).andExpect(jsonPath("$.code").value("NOT_A_MAIN_SERVICE"));
+
+        // A hidden service is never on the card.
+        mockMvc.perform(post("/barbers/me/services/{id}/hide", haircut.getId()).header("Authorization", bearer(barberUser)));
+        mockMvc.perform(get("/barbers/{id}", barber.getId())).andExpect(jsonPath("$.featuredServiceName").value("Κούρεμα + μούσι"));
+    }
+
+    private ResultActions feature(Long serviceId) throws Exception {
+        return mockMvc.perform(post("/barbers/me/services/{id}/feature", serviceId).header("Authorization", bearer(barberUser)));
     }
 
     @Test

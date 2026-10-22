@@ -34,13 +34,16 @@ public record BarberResponseDTO(
         // Filled in for the public listing and profile; null/0 elsewhere.
         String coverUrl,
         long photoCount,
-        BigDecimal fromPrice,
+        // The service shown with its price on the card (see ServiceOffering.headline).
+        String featuredServiceName,
+        BigDecimal featuredPrice,
         OffsetDateTime nextAvailable
 ) {
 
     /** What customers see on a barber's card besides the profile itself. */
-    public record Listing(long photoCount, BigDecimal fromPrice, OffsetDateTime nextAvailable) {
-        public static final Listing NONE = new Listing(0, null, null);
+    public record Listing(long photoCount, String featuredServiceName, BigDecimal featuredPrice,
+                          OffsetDateTime nextAvailable) {
+        public static final Listing NONE = new Listing(0, null, null, null);
     }
 
     public static BarberResponseDTO from(Barber barber) {
@@ -74,7 +77,8 @@ public record BarberResponseDTO(
                 // The barber's own cover; null means the app shows its default design.
                 MediaController.url(barber.getCoverKey()),
                 listing.photoCount(),
-                listing.fromPrice(),
+                listing.featuredServiceName(),
+                listing.featuredPrice(),
                 listing.nextAvailable()
         );
     }

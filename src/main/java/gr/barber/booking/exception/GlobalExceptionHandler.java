@@ -35,6 +35,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, exception);
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ProblemDetail handleTooManyRequests(TooManyRequestsException exception) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, exception);
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     public ProblemDetail handleUnauthorized(UnauthorizedException exception) {
         return withCode(ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage()), "INVALID_CREDENTIALS");

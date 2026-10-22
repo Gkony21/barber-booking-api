@@ -8,6 +8,11 @@ public enum AppointmentEventType {
     CANCELLED_BY_CUSTOMER,
     CANCELLED_BY_BARBER,
     RESCHEDULED_BY_CUSTOMER,
+    // A confirmed appointment the customer asked to move; the events carry the change.
+    CHANGE_REQUESTED,
+    CHANGE_ACCEPTED,
+    CHANGE_DECLINED,
+    CHANGE_WITHDRAWN,
     REQUEST_WAITING,
     REQUEST_EXPIRED,
     REMINDER_DAY,

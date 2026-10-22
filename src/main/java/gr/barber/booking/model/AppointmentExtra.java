@@ -45,6 +45,16 @@ public class AppointmentExtra {
         this.position = position;
     }
 
+    // The same extra on another appointment (a change of time keeps what was booked).
+    AppointmentExtra(Appointment appointment, AppointmentExtra copy) {
+        this.appointment = appointment;
+        this.service = copy.service;
+        this.name = copy.name;
+        this.price = copy.price;
+        this.durationMinutes = copy.durationMinutes;
+        this.position = copy.position;
+    }
+
     public String getName() {
         return name;
     }

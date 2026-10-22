@@ -13,6 +13,7 @@ import gr.barber.booking.model.Appointment;
 import gr.barber.booking.model.AppointmentStatus;
 import gr.barber.booking.model.Barber;
 import gr.barber.booking.model.CancelledBy;
+import gr.barber.booking.model.DayStatus;
 import gr.barber.booking.model.ServiceOffering;
 import gr.barber.booking.model.User;
 import gr.barber.booking.repository.AppointmentRepository;
@@ -95,7 +96,22 @@ public class AppointmentService {
         }
         Barber barber = barberService.getApprovedById(barberId);
         int length = minutes != null ? checkedLength(minutes) : select(barber, serviceId, extraIds).durationMinutes();
-        return availabilityService.dayStatuses(barber, from, to, length).entrySet().stream()
+        return toDays(availabilityService.dayStatuses(barber, from, to, length, List.of()));
+    }
+
+    /** Open, full or closed days for moving the customer's appointment; its own time counts as free. */
+    @Transactional(readOnly = true)
+    public List<DayStatusDTO> getMoveDays(String customerEmail, Long appointmentId, LocalDate from, LocalDate to) {
+        if (to.isBefore(from) || from.plusDays(62).isBefore(to)) {
+            throw new BadRequestException("INVALID_DATE_RANGE", "Ask for up to 62 days, 'from' before 'to'");
+        }
+        Appointment appointment = customerAppointment(findCustomer(customerEmail), appointmentId);
+        return toDays(availabilityService.dayStatuses(appointment.getBarber(), from, to, lengthOf(appointment),
+                withChange(appointment)));
+    }
+
+    private static List<DayStatusDTO> toDays(Map<LocalDate, DayStatus> statuses) {
+        return statuses.entrySet().stream()
                 .map(day -> new DayStatusDTO(day.getKey(), day.getValue()))
                 .toList();
     }
@@ -122,6 +138,19 @@ public class AppointmentService {
     public AvailabilityResponseDTO getAvailabilityFor(Long barberId, int minutes, LocalDate date) {
         Barber barber = barberService.getApprovedById(barberId);
         List<String> startTimes = availabilityService.findAvailableStartTimes(barber, date, checkedLength(minutes)).stream()
+                .map(TIME_FORMAT::format)
+                .toList();
+        return new AvailabilityResponseDTO(barber.getId(), null, date, minutes, startTimes);
+    }
+
+    /** Free starts for moving the customer's appointment; its own time (and any change of it) counts as free. */
+    @Transactional(readOnly = true)
+    public AvailabilityResponseDTO getMoveAvailability(String customerEmail, Long appointmentId, LocalDate date) {
+        Appointment appointment = customerAppointment(findCustomer(customerEmail), appointmentId);
+        Barber barber = appointment.getBarber();
+        int minutes = lengthOf(appointment);
+        List<String> startTimes = availabilityService.findAvailableStartTimes(barber, date, minutes, withChange(appointment))
+                .stream()
                 .map(TIME_FORMAT::format)
                 .toList();
         return new AvailabilityResponseDTO(barber.getId(), null, date, minutes, startTimes);
@@ -238,21 +267,21 @@ public class AppointmentService {
 
     @Transactional(readOnly = true)
     public List<AppointmentResponseDTO> getCustomerAppointments(String customerEmail) {
-        User customer = userRepository.findByEmail(customerEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        return appointmentRepository.findAllByCustomerIdOrderByStartAtDesc(customer.getId()).stream()
-                .map(a -> AppointmentResponseDTO.from(a, zone()))
+        User customer = findCustomer(customerEmail);
+        List<Appointment> appointments = appointmentRepository.findAllByCustomerIdOrderByStartAtDesc(customer.getId());
+        // A change of time shows on the appointment it would move, not as an appointment of its own.
+        Map<Long, Appointment> changes = appointments.stream().filter(Appointment::isChange)
+                .collect(Collectors.toMap(a -> a.getReplaces().getId(), a -> a));
+        return appointments.stream()
+                .filter(a -> !a.isChange())
+                .map(a -> AppointmentResponseDTO.from(a, zone(), 0, changes.get(a.getId())))
                 .toList();
     }
 
     @Transactional
     public AppointmentResponseDTO cancelByCustomer(String customerEmail, Long appointmentId) {
 
-        User customer = userRepository.findByEmail(customerEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        Appointment appointment = appointmentRepository.findByIdAndCustomerId(appointmentId, customer.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
-
+        Appointment appointment = customerAppointment(findCustomer(customerEmail), appointmentId);
         requireActiveAndUpcoming(appointment);
 
         // A pending request was never accepted, so it can be withdrawn at any time before it starts.
@@ -262,22 +291,24 @@ public class AppointmentService {
                     + bookingProperties.cancellationCutoff().toHours() + " hours before they start");
         }
 
+        dropChange(appointment); // the cancellation email covers it
         appointment.cancel(CancelledBy.CUSTOMER);
         publish(AppointmentEventType.CANCELLED_BY_CUSTOMER, appointment);
         return AppointmentResponseDTO.from(appointment, zone());
     }
 
     /**
-     * Moves the customer's appointment to another time of the same barber, with the same services.
-     * Allowed while it could still be cancelled; a barber who approves by hand answers again.
+     * Moves the customer's appointment to another time of the same barber, with the same services,
+     * while it could still be cancelled. A request simply moves, and so does a confirmed appointment
+     * of a barber who confirms automatically. Otherwise the confirmed appointment keeps its time and
+     * the new one waits for the barber as a change; asking again moves that change.
      */
     @Transactional
     public AppointmentResponseDTO rescheduleByCustomer(String customerEmail, Long appointmentId, LocalDateTime newStart) {
 
         User customer = userRepository.findByEmailForUpdate(customerEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        Appointment appointment = appointmentRepository.findByIdAndCustomerId(appointmentId, customer.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+        Appointment appointment = customerAppointment(customer, appointmentId);
         requireActiveAndUpcoming(appointment);
 
         Instant now = clock.instant();
@@ -292,7 +323,15 @@ public class AppointmentService {
         Duration length = Duration.between(appointment.getStartAt(), appointment.getEndAt());
         Instant startAt = newStart.atZone(zone).toInstant();
         Instant endAt = startAt.plus(length);
+        Appointment change = appointmentRepository.findByReplacesId(appointment.getId()).orElse(null);
 
+        if (startAt.equals(appointment.getStartAt())) {
+            // Back to the time it already has: nothing left to ask the barber.
+            if (change != null) {
+                withdraw(change);
+            }
+            return AppointmentResponseDTO.from(appointment, zone);
+        }
         if (startAt.isBefore(now.plus(barber.bookingNotice()))) {
             throw new BadRequestException("TOO_SOON",
                     "This barber takes bookings at least " + barber.bookingNotice().toMinutes() + " minutes ahead");
@@ -304,9 +343,10 @@ public class AppointmentService {
         if (!availabilityService.fitsSchedule(barber, newStart.toLocalDate(), newStart.toLocalTime(), (int) length.toMinutes())) {
             throw new BadRequestException("BARBER_NOT_WORKING", "The barber is not working at this time");
         }
+        List<Long> own = withChange(appointment);
         boolean taken = appointmentRepository.findActiveForBarberOverlapping(barber.getId(),
                         startAt.minus(barber.buffer()), endAt.plus(barber.buffer())).stream()
-                .anyMatch(other -> !other.getId().equals(appointment.getId()));
+                .anyMatch(other -> !own.contains(other.getId()));
         if (taken) {
             throw new ConflictException("SLOT_TAKEN", "This time is no longer available");
         }
@@ -314,15 +354,50 @@ public class AppointmentService {
             throw new ConflictException("CUSTOMER_OVERLAP", "You already have an appointment at this time");
         }
 
+        if (appointment.getStatus() == AppointmentStatus.CONFIRMED && !barber.isAutoConfirmBookings()) {
+            if (change == null) {
+                change = Appointment.changeOf(appointment, startAt, endAt);
+            } else {
+                change.moveTo(startAt, endAt, AppointmentStatus.PENDING);
+            }
+            change = saveOrSlotTaken(change);
+            publish(AppointmentEventType.CHANGE_REQUESTED, change);
+            return AppointmentResponseDTO.from(appointment, zone, 0, change);
+        }
+
+        if (change != null) {
+            // Asked before the barber switched to confirming automatically: the move below replaces it.
+            appointmentRepository.delete(change);
+            appointmentRepository.flush();
+        }
         AppointmentStatus status = barber.isAutoConfirmBookings() ? AppointmentStatus.CONFIRMED : AppointmentStatus.PENDING;
         appointment.moveTo(startAt, endAt, status);
+        saveOrSlotTaken(appointment);
+        publish(AppointmentEventType.RESCHEDULED_BY_CUSTOMER, appointment);
+        return AppointmentResponseDTO.from(appointment, zone);
+    }
+
+    /** Takes back a change of time the barber has not answered yet; the appointment keeps its time. */
+    @Transactional
+    public AppointmentResponseDTO withdrawChange(String customerEmail, Long appointmentId) {
+        Appointment appointment = customerAppointment(findCustomer(customerEmail), appointmentId);
+        Appointment change = appointmentRepository.findByReplacesId(appointment.getId())
+                .orElseThrow(() -> new BadRequestException("NO_CHANGE", "There is no change of time to withdraw"));
+        withdraw(change);
+        return AppointmentResponseDTO.from(appointment, zone());
+    }
+
+    private void withdraw(Appointment change) {
+        publish(AppointmentEventType.CHANGE_WITHDRAWN, change);
+        appointmentRepository.delete(change);
+    }
+
+    private Appointment saveOrSlotTaken(Appointment appointment) {
         try {
-            appointmentRepository.saveAndFlush(appointment);
+            return appointmentRepository.saveAndFlush(appointment);
         } catch (DataIntegrityViolationException e) {
             throw new ConflictException("SLOT_TAKEN", "This time is no longer available");
         }
-        publish(AppointmentEventType.RESCHEDULED_BY_CUSTOMER, appointment);
-        return AppointmentResponseDTO.from(appointment, zone);
     }
 
     @Transactional(readOnly = true)
@@ -349,9 +424,15 @@ public class AppointmentService {
         Map<Long, Long> noShows = customerIds.isEmpty() ? Map.of() : appointmentRepository.countNoShows(customerIds).stream()
                 .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
 
+        // Changes of time asked for these appointments, which may fall on days outside the range.
+        List<Long> originalIds = appointments.stream().filter(a -> !a.isChange()).map(Appointment::getId).toList();
+        Map<Long, Appointment> changes = originalIds.isEmpty() ? Map.of() : appointmentRepository.findAllByReplacesIdIn(originalIds)
+                .stream().collect(Collectors.toMap(c -> c.getReplaces().getId(), c -> c));
+
         return appointments.stream()
                 .map(a -> AppointmentResponseDTO.from(a, zone,
-                        a.getCustomer() == null ? 0 : noShows.getOrDefault(a.getCustomer().getId(), 0L).intValue()))
+                        a.getCustomer() == null ? 0 : noShows.getOrDefault(a.getCustomer().getId(), 0L).intValue(),
+                        changes.get(a.getId())))
                 .toList();
     }
 
@@ -359,15 +440,42 @@ public class AppointmentService {
     public AppointmentResponseDTO confirmByBarber(String barberEmail, Long appointmentId) {
         Appointment appointment = getBarberAppointment(barberEmail, appointmentId);
         requirePendingAndUpcoming(appointment);
+        if (appointment.isChange()) {
+            return acceptChange(appointment);
+        }
         appointment.confirm();
         publish(AppointmentEventType.CONFIRMED_BY_BARBER, appointment);
         return AppointmentResponseDTO.from(appointment, zone());
+    }
+
+    // The confirmed appointment moves to the new time, and the change is no longer needed.
+    private AppointmentResponseDTO acceptChange(Appointment change) {
+        Appointment original = change.getReplaces();
+        requireActiveAndUpcoming(original);
+        publish(AppointmentEventType.CHANGE_ACCEPTED, change);
+        Instant startAt = change.getStartAt();
+        Instant endAt = change.getEndAt();
+        appointmentRepository.delete(change);
+        appointmentRepository.flush();
+        original.moveTo(startAt, endAt, AppointmentStatus.CONFIRMED);
+        return AppointmentResponseDTO.from(original, zone());
+    }
+
+    // The confirmed appointment keeps its time.
+    private AppointmentResponseDTO declineChange(Appointment change) {
+        Appointment original = change.getReplaces();
+        publish(AppointmentEventType.CHANGE_DECLINED, change);
+        appointmentRepository.delete(change);
+        return AppointmentResponseDTO.from(original, zone());
     }
 
     @Transactional
     public AppointmentResponseDTO rejectByBarber(String barberEmail, Long appointmentId) {
         Appointment appointment = getBarberAppointment(barberEmail, appointmentId);
         requirePendingAndUpcoming(appointment);
+        if (appointment.isChange()) {
+            return declineChange(appointment);
+        }
         appointment.reject();
         publish(AppointmentEventType.REJECTED_BY_BARBER, appointment);
         return AppointmentResponseDTO.from(appointment, zone());
@@ -391,6 +499,10 @@ public class AppointmentService {
     public AppointmentResponseDTO cancelByBarber(String barberEmail, Long appointmentId) {
         Appointment appointment = getBarberAppointment(barberEmail, appointmentId);
         requireActiveAndUpcoming(appointment);
+        if (appointment.isChange()) {
+            return declineChange(appointment);
+        }
+        dropChange(appointment);
         appointment.cancel(CancelledBy.BARBER);
         publish(AppointmentEventType.CANCELLED_BY_BARBER, appointment);
         return AppointmentResponseDTO.from(appointment, zone());
@@ -400,6 +512,33 @@ public class AppointmentService {
         Barber barber = barberService.getByEmail(barberEmail);
         return appointmentRepository.findByIdAndBarberId(appointmentId, barber.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+    }
+
+    private User findCustomer(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    // The customer's appointment; a change of time stands for the appointment it would move.
+    private Appointment customerAppointment(User customer, Long appointmentId) {
+        Appointment appointment = appointmentRepository.findByIdAndCustomerId(appointmentId, customer.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+        return appointment.isChange() ? appointment.getReplaces() : appointment;
+    }
+
+    // The appointment and its change of time, if one is waiting.
+    private List<Long> withChange(Appointment appointment) {
+        return appointmentRepository.findByReplacesId(appointment.getId())
+                .map(change -> List.of(appointment.getId(), change.getId()))
+                .orElse(List.of(appointment.getId()));
+    }
+
+    private void dropChange(Appointment appointment) {
+        appointmentRepository.findByReplacesId(appointment.getId()).ifPresent(appointmentRepository::delete);
+    }
+
+    private static int lengthOf(Appointment appointment) {
+        return (int) Duration.between(appointment.getStartAt(), appointment.getEndAt()).toMinutes();
     }
 
     /** One main service plus any extras; the appointment lasts as long as all of them together. */

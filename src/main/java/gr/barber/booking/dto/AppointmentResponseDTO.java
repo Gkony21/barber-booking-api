@@ -31,17 +31,21 @@ public record AppointmentResponseDTO(
         CancelledBy cancelledBy,
         String note,
         // For the barber: how many times this customer did not turn up (0 elsewhere).
-        int customerNoShows
+        int customerNoShows,
+        // A confirmed appointment the customer asked to move: the time asked for, until the barber answers.
+        OffsetDateTime requestedStartTime,
+        // On that request itself (barber's schedule): the confirmed time it would replace.
+        OffsetDateTime originalStartTime
 ) {
 
     public record Extra(String name, BigDecimal price, int durationMinutes) {
     }
 
     public static AppointmentResponseDTO from(Appointment appointment, ZoneId zone) {
-        return from(appointment, zone, 0);
+        return from(appointment, zone, 0, null);
     }
 
-    public static AppointmentResponseDTO from(Appointment appointment, ZoneId zone, int customerNoShows) {
+    public static AppointmentResponseDTO from(Appointment appointment, ZoneId zone, int customerNoShows, Appointment change) {
         return new AppointmentResponseDTO(
                 appointment.getId(),
                 appointment.getBarber().getId(),
@@ -62,7 +66,9 @@ public record AppointmentResponseDTO(
                 appointment.isManual(),
                 appointment.getCancelledBy(),
                 appointment.getCustomerNote(),
-                customerNoShows
+                customerNoShows,
+                change != null ? change.getStartAt().atZone(zone).toOffsetDateTime() : null,
+                appointment.isChange() ? appointment.getReplaces().getStartAt().atZone(zone).toOffsetDateTime() : null
         );
     }
 }

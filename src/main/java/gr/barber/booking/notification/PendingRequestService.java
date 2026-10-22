@@ -16,7 +16,8 @@ import java.time.Instant;
 /**
  * Requests waiting for the barber's answer: the barber is reminded once when one has waited a
  * while, and any still unanswered 2 hours before it starts is closed, so the customer hears
- * back and the time is free again.
+ * back and the time is free again. An unanswered change of time closes 2 hours before whichever
+ * comes first, its new time or the confirmed one, which then simply stays.
  */
 @Service
 public class PendingRequestService {
@@ -49,8 +50,12 @@ public class PendingRequestService {
             transactions.executeWithoutResult(status -> appointmentRepository.findById(request.getId())
                     .filter(a -> a.getStatus() == AppointmentStatus.PENDING)
                     .ifPresent(a -> {
-                        a.expire();
                         eventPublisher.publishEvent(AppointmentEvent.of(AppointmentEventType.REQUEST_EXPIRED, a, bookingProperties.timeZone()));
+                        if (a.isChange()) {
+                            appointmentRepository.delete(a); // the confirmed appointment keeps its time
+                        } else {
+                            a.expire();
+                        }
                     }));
         }
 

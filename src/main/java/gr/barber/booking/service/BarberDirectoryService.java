@@ -13,7 +13,6 @@ import gr.barber.booking.repository.WorkingHoursRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -25,7 +24,6 @@ import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -117,37 +115,35 @@ public class BarberDirectoryService {
         return BarberResponseDTO.from(barber, listings(List.of(barber)).get(barber.getId()));
     }
 
-    // Photo count, starting price and next free time for every barber, in a handful of
+    // Photo count, the service on the card and next free time for every barber, in a handful of
     // queries in total rather than dozens per barber.
     private Map<Long, BarberResponseDTO.Listing> listings(List<Barber> barbers) {
         List<Long> ids = barbers.stream().map(Barber::getId).toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
-        // Extras are add-ons: the starting price and next free time come from the main services.
-        Map<Long, List<ServiceOffering>> services = serviceRepository.findAllByBarberIdInAndActiveTrue(ids).stream()
-                .filter(ServiceOffering::isMain)
-                .collect(Collectors.groupingBy(service -> service.getBarber().getId()));
+        Map<Long, ServiceOffering> headlines = new HashMap<>();
+        serviceRepository.findAllByBarberIdInAndActiveTrue(ids).stream()
+                .collect(Collectors.groupingBy(service -> service.getBarber().getId()))
+                .forEach((barberId, offered) -> ServiceOffering.headline(offered)
+                        .ifPresent(headline -> headlines.put(barberId, headline)));
         Map<Long, List<String>> photoKeys = new HashMap<>();
         for (Object[] row : photoRepository.findKeysNewestFirst(ids)) {
             photoKeys.computeIfAbsent((Long) row[0], key -> new ArrayList<>()).add((String) row[1]);
         }
 
-        // Next free time for the barber's shortest service.
-        Map<Long, Integer> shortest = new HashMap<>();
-        services.forEach((barberId, offered) -> offered.stream().map(ServiceOffering::getDurationMinutes)
-                .filter(Objects::nonNull).min(Comparator.naturalOrder())
-                .ifPresent(minutes -> shortest.put(barberId, minutes)));
-        Map<Long, OffsetDateTime> nextAvailable = availabilityService.nextAvailable(barbers, shortest);
+        // Next free time for the service on the card, so the two read together ("Κούρεμα 12 €, today 11:00").
+        Map<Long, Integer> durations = new HashMap<>();
+        headlines.forEach((barberId, headline) -> durations.put(barberId, headline.getDurationMinutes()));
+        Map<Long, OffsetDateTime> nextAvailable = availabilityService.nextAvailable(barbers, durations);
 
         Map<Long, BarberResponseDTO.Listing> listings = new HashMap<>();
         for (Long id : ids) {
-            List<String> keys = photoKeys.getOrDefault(id, List.of());
-            // Free extras (e.g. a 0 € wash) would make every barber read "από 0 €".
-            BigDecimal fromPrice = services.getOrDefault(id, List.of()).stream().map(ServiceOffering::getPrice)
-                    .filter(price -> price.signum() > 0)
-                    .min(Comparator.naturalOrder()).orElse(null);
-            listings.put(id, new BarberResponseDTO.Listing(keys.size(), fromPrice, nextAvailable.get(id)));
+            ServiceOffering headline = headlines.get(id);
+            listings.put(id, new BarberResponseDTO.Listing(photoKeys.getOrDefault(id, List.of()).size(),
+                    headline != null ? headline.getName() : null,
+                    headline != null ? headline.getPrice() : null,
+                    nextAvailable.get(id)));
         }
         return listings;
     }

@@ -2,8 +2,10 @@ package gr.barber.booking.auth;
 
 import gr.barber.booking.exception.BadRequestException;
 import gr.barber.booking.exception.EmailNotVerifiedException;
+import gr.barber.booking.exception.TooManyRequestsException;
 import gr.barber.booking.exception.UnauthorizedException;
 import gr.barber.booking.model.Role;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import gr.barber.booking.dto.UserRequestDTO;
@@ -17,6 +19,9 @@ import gr.barber.booking.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import gr.barber.booking.security.JwtService;
 
+import java.time.Clock;
+import java.time.Duration;
+
 @Service
 public class AuthService {
 
@@ -28,18 +33,24 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailVerificationService emailVerificationService;
+    private final Clock clock;
+    private final int dailySignUps;
 
     public AuthService(UserService userService,
                        UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
-                       EmailVerificationService emailVerificationService) {
+                       EmailVerificationService emailVerificationService,
+                       Clock clock,
+                       @Value("${app.registration.daily-limit:100}") int dailySignUps) {
 
         this.userService = userService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.emailVerificationService = emailVerificationService;
+        this.clock = clock;
+        this.dailySignUps = dailySignUps;
     }
 
     @Transactional
@@ -53,13 +64,19 @@ public class AuthService {
             throw new BadRequestException("TERMS_NOT_ACCEPTED", "You need to accept the terms and privacy policy");
         }
 
+        // Each sign-up sends an email, and the free mail plan has a daily limit that booking emails need too;
+        // the per-address rate limit cannot stop someone who uses many addresses.
+        if (userRepository.countByCreatedAtAfter(clock.instant().minus(Duration.ofDays(1))) >= dailySignUps) {
+            throw new TooManyRequestsException("SIGN_UPS_PAUSED", "Too many sign-ups today; try again tomorrow");
+        }
+
         // Barbers need a way to reach customers (running late, a cancellation), and the admin barbers.
         request.setPhoneNumber(PhoneNumbers.normalize(request.getPhoneNumber()));
 
         UserResponseDTO response = userService.saveUser(request, false);
 
         User user = userRepository.getReferenceById(response.getId());
-        user.setTermsAcceptedAt(java.time.Instant.now());
+        user.setTermsAcceptedAt(clock.instant());
         emailVerificationService.sendVerification(user);
 
         return response;
