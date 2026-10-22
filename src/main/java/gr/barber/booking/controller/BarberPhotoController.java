@@ -59,6 +59,16 @@ public class BarberPhotoController {
         return photoService.setAvatar(authentication.getName(), file);
     }
 
+    @PutMapping(value = "/me/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public BarberResponseDTO setCover(@RequestParam("file") MultipartFile file, Authentication authentication) {
+        return photoService.setCover(authentication.getName(), file);
+    }
+
+    @DeleteMapping("/me/cover")
+    public BarberResponseDTO removeCover(Authentication authentication) {
+        return photoService.removeCover(authentication.getName());
+    }
+
     @DeleteMapping("/me/avatar")
     public BarberResponseDTO removeAvatar(Authentication authentication) {
         return photoService.removeAvatar(authentication.getName());

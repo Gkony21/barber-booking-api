@@ -2,6 +2,7 @@ package gr.barber.booking.controller;
 
 import gr.barber.booking.dto.AppointmentResponseDTO;
 import gr.barber.booking.dto.AvailabilityResponseDTO;
+import gr.barber.booking.dto.DayStatusDTO;
 import gr.barber.booking.dto.ManualAppointmentRequestDTO;
 import gr.barber.booking.dto.TimeOffRequestDTO;
 import gr.barber.booking.dto.TimeOffResponseDTO;
@@ -38,6 +39,25 @@ public class BarberAppointmentController {
         return minutes != null
                 ? appointmentService.getAvailabilityFor(barberId, minutes, date)
                 : appointmentService.getAvailability(barberId, serviceId, extraIds, date);
+    }
+
+    // Which days are open, full or closed, so the app can grey out closed days.
+    @GetMapping("/{barberId}/days")
+    public List<DayStatusDTO> getDays(@PathVariable Long barberId,
+                                      @RequestParam(required = false) Long serviceId,
+                                      @RequestParam(required = false) List<Long> extraIds,
+                                      @RequestParam(required = false) Integer minutes,
+                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return appointmentService.getDays(barberId, serviceId, extraIds, minutes, from, to);
+    }
+
+    // The barber's own free times within working hours, for entering a booking by hand.
+    @GetMapping("/me/availability")
+    public AvailabilityResponseDTO getMyAvailability(@RequestParam int minutes,
+                                                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                                     Authentication authentication) {
+        return appointmentService.getOwnAvailability(authentication.getName(), minutes, date);
     }
 
     @GetMapping("/me/appointments")

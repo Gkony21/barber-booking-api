@@ -90,6 +90,32 @@ class BarberPhotoTest extends IntegrationTest {
                 .andExpect(jsonPath("$.avatarUrl").doesNotExist());
     }
 
+    // The cover is wide (16:9) and the barber's own choice; work photos no longer become the cover.
+    @Test
+    void coverIsWideAndSeparateFromWorkPhotos() throws Exception {
+        upload("/barbers/me/photos", png(600, 600)).andExpect(status().isCreated());
+        mockMvc.perform(get("/barbers/{id}", barber.getId())).andExpect(jsonPath("$.coverUrl").doesNotExist());
+
+        upload("/barbers/me/cover", png(3000, 3000), "PUT").andExpect(status().isOk());
+        String key = keyOf(barberRepository.findById(barber.getId()).orElseThrow().getCoverKey());
+        BufferedImage cover = ImageIO.read(storage.load(key).orElseThrow().getInputStream());
+        assertThat(cover.getWidth()).isEqualTo(1600);
+        assertThat(cover.getHeight()).isEqualTo(900);
+        mockMvc.perform(get("/barbers/{id}", barber.getId())).andExpect(jsonPath("$.coverUrl").value("/media/" + key));
+
+        // A small upload is cropped to 16:9 but not enlarged.
+        upload("/barbers/me/cover", png(800, 300), "PUT").andExpect(status().isOk());
+        assertThat(storage.load(key)).isEmpty();
+        String smallKey = keyOf(barberRepository.findById(barber.getId()).orElseThrow().getCoverKey());
+        BufferedImage small = ImageIO.read(storage.load(smallKey).orElseThrow().getInputStream());
+        assertThat(small.getWidth()).isEqualTo(533);
+        assertThat(small.getHeight()).isEqualTo(300);
+
+        mockMvc.perform(delete("/barbers/me/cover").header("Authorization", bearer(barberUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverUrl").doesNotExist());
+    }
+
     @Test
     void photosCanHaveAShortCaption() throws Exception {
         String body = mockMvc.perform(multipart("/barbers/me/photos")

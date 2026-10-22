@@ -5,6 +5,7 @@ import gr.barber.booking.dto.AppointmentRequestDTO;
 import gr.barber.booking.dto.AppointmentResponseDTO;
 import gr.barber.booking.dto.ManualAppointmentRequestDTO;
 import gr.barber.booking.dto.AvailabilityResponseDTO;
+import gr.barber.booking.dto.DayStatusDTO;
 import gr.barber.booking.exception.BadRequestException;
 import gr.barber.booking.exception.ConflictException;
 import gr.barber.booking.exception.ResourceNotFoundException;
@@ -70,9 +71,6 @@ public class AppointmentService {
 
     @Transactional(readOnly = true)
     public AvailabilityResponseDTO getAvailability(Long barberId, Long serviceId, List<Long> extraIds, LocalDate date) {
-        if (serviceId == null) {
-            throw new BadRequestException("VALIDATION_FAILED", "Choose a service (serviceId) or a length (minutes)");
-        }
 
         Barber barber = barberService.getApprovedById(barberId);
         Selection selection = select(barber, serviceId, extraIds);
@@ -85,14 +83,45 @@ public class AppointmentService {
         return new AvailabilityResponseDTO(barber.getId(), serviceId, date, selection.durationMinutes(), startTimes);
     }
 
-    /** Free starts for an appointment of a given length, e.g. one being moved to another time. */
+    /**
+     * Open, full or closed for each day from..to, for the chosen services (or a length, when moving an
+     * appointment). At most about two months at a time.
+     */
     @Transactional(readOnly = true)
-    public AvailabilityResponseDTO getAvailabilityFor(Long barberId, int minutes, LocalDate date) {
+    public List<DayStatusDTO> getDays(Long barberId, Long serviceId, List<Long> extraIds, Integer minutes,
+                                      LocalDate from, LocalDate to) {
+        if (to.isBefore(from) || from.plusDays(62).isBefore(to)) {
+            throw new BadRequestException("INVALID_DATE_RANGE", "Ask for up to 62 days, 'from' before 'to'");
+        }
+        Barber barber = barberService.getApprovedById(barberId);
+        int length = minutes != null ? checkedLength(minutes) : select(barber, serviceId, extraIds).durationMinutes();
+        return availabilityService.dayStatuses(barber, from, to, length).entrySet().stream()
+                .map(day -> new DayStatusDTO(day.getKey(), day.getValue()))
+                .toList();
+    }
+
+    /** The barber's own free quarter hours within working hours, for entering a phone or walk-in booking. */
+    @Transactional(readOnly = true)
+    public AvailabilityResponseDTO getOwnAvailability(String barberEmail, int minutes, LocalDate date) {
+        Barber barber = barberService.getByEmail(barberEmail);
+        List<String> startTimes = availabilityService.freeStartsForBarber(barber, date, checkedLength(minutes)).stream()
+                .map(TIME_FORMAT::format)
+                .toList();
+        return new AvailabilityResponseDTO(barber.getId(), null, date, minutes, startTimes);
+    }
+
+    private static int checkedLength(int minutes) {
         if (minutes < 5 || minutes > 600) {
             throw new BadRequestException("VALIDATION_FAILED", "Length must be between 5 and 600 minutes");
         }
+        return minutes;
+    }
+
+    /** Free starts for an appointment of a given length, e.g. one being moved to another time. */
+    @Transactional(readOnly = true)
+    public AvailabilityResponseDTO getAvailabilityFor(Long barberId, int minutes, LocalDate date) {
         Barber barber = barberService.getApprovedById(barberId);
-        List<String> startTimes = availabilityService.findAvailableStartTimes(barber, date, minutes).stream()
+        List<String> startTimes = availabilityService.findAvailableStartTimes(barber, date, checkedLength(minutes)).stream()
                 .map(TIME_FORMAT::format)
                 .toList();
         return new AvailabilityResponseDTO(barber.getId(), null, date, minutes, startTimes);
@@ -382,6 +411,9 @@ public class AppointmentService {
 
     // Both must be the barber's own active services, of the right kind; extras keep the given order.
     private Selection select(Barber barber, Long serviceId, List<Long> extraIds) {
+        if (serviceId == null) {
+            throw new BadRequestException("VALIDATION_FAILED", "Choose a service (serviceId) or a length (minutes)");
+        }
         ServiceOffering main = serviceOfferingRepository.findByIdAndBarberId(serviceId, barber.getId())
                 .filter(ServiceOffering::isActive)
                 .filter(ServiceOffering::isMain)

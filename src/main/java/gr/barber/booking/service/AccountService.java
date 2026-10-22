@@ -88,6 +88,9 @@ public class AccountService {
             if (barber.getAvatarKey() != null) {
                 imageKeys.add(barber.getAvatarKey());
             }
+            if (barber.getCoverKey() != null) {
+                imageKeys.add(barber.getCoverKey());
+            }
             photoRepository.findAllByBarberIdOrderByCreatedAtDescIdDesc(barber.getId())
                     .forEach(photo -> imageKeys.add(photo.getImageKey()));
         });

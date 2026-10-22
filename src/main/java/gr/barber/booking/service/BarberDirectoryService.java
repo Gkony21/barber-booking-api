@@ -117,7 +117,7 @@ public class BarberDirectoryService {
         return BarberResponseDTO.from(barber, listings(List.of(barber)).get(barber.getId()));
     }
 
-    // Cover, photo count, starting price and next free time for every barber, in a handful of
+    // Photo count, starting price and next free time for every barber, in a handful of
     // queries in total rather than dozens per barber.
     private Map<Long, BarberResponseDTO.Listing> listings(List<Barber> barbers) {
         List<Long> ids = barbers.stream().map(Barber::getId).toList();
@@ -147,8 +147,7 @@ public class BarberDirectoryService {
             BigDecimal fromPrice = services.getOrDefault(id, List.of()).stream().map(ServiceOffering::getPrice)
                     .filter(price -> price.signum() > 0)
                     .min(Comparator.naturalOrder()).orElse(null);
-            listings.put(id, new BarberResponseDTO.Listing(
-                    keys.isEmpty() ? null : keys.getFirst(), keys.size(), fromPrice, nextAvailable.get(id)));
+            listings.put(id, new BarberResponseDTO.Listing(keys.size(), fromPrice, nextAvailable.get(id)));
         }
         return listings;
     }

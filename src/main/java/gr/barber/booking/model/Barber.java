@@ -65,6 +65,9 @@ public class Barber {
     // Storage key of the profile photo, or null.
     private String avatarKey;
 
+    // Storage key of the cover image (wide, top of the page and card), or null for the default design.
+    private String coverKey;
+
     // Appointments may start every this many minutes from the start of a shift (15 or 30).
     @Column(nullable = false)
     private int slotStepMinutes = 30;
@@ -182,6 +185,14 @@ public class Barber {
 
     public void setSlug(String slug) {
         this.slug = slug;
+    }
+
+    public String getCoverKey() {
+        return coverKey;
+    }
+
+    public void setCoverKey(String coverKey) {
+        this.coverKey = coverKey;
     }
 
     public String getAvatarKey() {

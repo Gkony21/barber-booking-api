@@ -3,6 +3,7 @@ package gr.barber.booking.service;
 import gr.barber.booking.config.BookingProperties;
 import gr.barber.booking.model.Appointment;
 import gr.barber.booking.model.Barber;
+import gr.barber.booking.model.DayStatus;
 import gr.barber.booking.model.TimeOff;
 import gr.barber.booking.model.WorkingHours;
 import gr.barber.booking.repository.AppointmentRepository;
@@ -22,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -117,6 +119,38 @@ public class AvailabilityService {
     }
 
     /**
+     * Whether each day from..to is open, full or closed for an appointment of the given length, so the
+     * customer can see at a glance which days to pick. All days are worked out from one load.
+     */
+    @Transactional(readOnly = true)
+    public Map<LocalDate, DayStatus> dayStatuses(Barber barber, LocalDate from, LocalDate to, int durationMinutes) {
+        Schedule schedule = load(List.of(barber.getId()), from, to).getOrDefault(barber.getId(), Schedule.EMPTY);
+        Instant now = clock.instant();
+        Map<LocalDate, DayStatus> statuses = new LinkedHashMap<>();
+        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+            if (schedule.isOff(date) || schedule.shiftsOn(date).isEmpty()) {
+                statuses.put(date, DayStatus.CLOSED);
+            } else if (!isWithinBookingWindow(barber, date) || startTimes(barber, date, durationMinutes, schedule, now).isEmpty()) {
+                statuses.put(date, DayStatus.FULL);
+            } else {
+                statuses.put(date, DayStatus.OPEN);
+            }
+        }
+        return statuses;
+    }
+
+    /**
+     * Free starts for the barber's own entries (phone or walk-in customers): every quarter hour within
+     * working hours that is not taken or blocked. No notice, booking window or break applies; times
+     * outside working hours stay possible from the app, by choice.
+     */
+    @Transactional(readOnly = true)
+    public List<LocalTime> freeStartsForBarber(Barber barber, LocalDate date, int durationMinutes) {
+        Schedule schedule = load(List.of(barber.getId()), date, date).getOrDefault(barber.getId(), Schedule.EMPTY);
+        return startTimes(date, durationMinutes, schedule, 15, clock.instant(), Duration.ZERO);
+    }
+
+    /**
      * Checks everything except overlaps with other appointments, which the caller checks
      * (and the database enforces) separately.
      */
@@ -146,14 +180,17 @@ public class AvailabilityService {
         return !date.isBefore(today) && !date.isAfter(today.plusDays(barber.getBookingWindowDays()));
     }
 
+    // What a customer can book: the barber's step, notice and break apply.
     private List<LocalTime> startTimes(Barber barber, LocalDate date, int durationMinutes, Schedule schedule, Instant now) {
+        return startTimes(date, durationMinutes, schedule, barber.getSlotStepMinutes(), now.plus(barber.bookingNotice()), barber.buffer());
+    }
+
+    private List<LocalTime> startTimes(LocalDate date, int durationMinutes, Schedule schedule,
+                                       int step, Instant earliest, Duration buffer) {
         if (schedule.isOff(date)) {
             return List.of();
         }
         ZoneId zone = bookingProperties.timeZone();
-        int step = barber.getSlotStepMinutes();
-        Instant earliest = now.plus(barber.bookingNotice());
-        Duration buffer = barber.buffer();
         List<LocalTime> available = new ArrayList<>();
 
         for (WorkingHours shift : schedule.shiftsOn(date)) {
