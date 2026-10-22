@@ -26,8 +26,9 @@ services:
         sync: false # the same address as FRONTEND_URL
       - key: MAIL_HOST
         value: smtp-relay.brevo.com
+      # Render's free plan blocks the usual mail ports (25, 465, 587); Brevo also listens on 2525.
       - key: MAIL_PORT
-        value: "587"
+        value: "2525"
       - key: MAIL_AUTH
         value: "true"
       - key: MAIL_STARTTLS
