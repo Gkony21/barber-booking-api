@@ -37,6 +37,9 @@ public class User {
     // When the terms and privacy policy were accepted at sign-up; null for accounts created earlier.
     private java.time.Instant termsAcceptedAt;
 
+    @Column(nullable = false, updatable = false)
+    private java.time.Instant createdAt = java.time.Instant.now();
+
     // See V10: tokens with an older version are no longer accepted.
     @Column(nullable = false)
     private int tokenVersion = 0;
@@ -56,6 +59,14 @@ public class User {
 
     public Long getId() {
         return id;
+    }
+
+    public java.time.Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(java.time.Instant createdAt) {
+        this.createdAt = createdAt;
     }
 
     public void setId(Long id) {

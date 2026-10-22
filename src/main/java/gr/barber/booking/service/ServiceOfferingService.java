@@ -2,6 +2,7 @@ package gr.barber.booking.service;
 
 import gr.barber.booking.dto.ServiceOfferingRequestDTO;
 import gr.barber.booking.dto.ServiceOfferingResponseDTO;
+import gr.barber.booking.exception.BadRequestException;
 import gr.barber.booking.exception.ResourceNotFoundException;
 import gr.barber.booking.model.Barber;
 import gr.barber.booking.model.ServiceOffering;
@@ -26,17 +27,33 @@ public class ServiceOfferingService {
     @Transactional(readOnly = true)
     public List<ServiceOfferingResponseDTO> getActiveServices(Long barberId) {
         Barber barber = barberService.getApprovedById(barberId);
-        return serviceOfferingRepository.findAllByBarberIdAndActiveTrueOrderByName(barber.getId()).stream()
-                .map(ServiceOfferingResponseDTO::from)
-                .toList();
+        return withHeadline(serviceOfferingRepository.findAllByBarberIdAndActiveTrueOrderByName(barber.getId()));
     }
 
     @Transactional(readOnly = true)
     public List<ServiceOfferingResponseDTO> getMyServices(String email) {
         Barber barber = barberService.getByEmail(email);
-        return serviceOfferingRepository.findAllByBarberIdAndDeletedFalseOrderByName(barber.getId()).stream()
-                .map(ServiceOfferingResponseDTO::from)
+        return withHeadline(serviceOfferingRepository.findAllByBarberIdAndDeletedFalseOrderByName(barber.getId()));
+    }
+
+    private static List<ServiceOfferingResponseDTO> withHeadline(List<ServiceOffering> services) {
+        Long headline = ServiceOffering.headline(services).map(ServiceOffering::getId).orElse(null);
+        return services.stream()
+                .map(service -> ServiceOfferingResponseDTO.from(service, service.getId().equals(headline)))
                 .toList();
+    }
+
+    /** Shows this main service with its price on the barber's card, instead of any chosen before. */
+    @Transactional
+    public void featureService(String email, Long serviceId) {
+        ServiceOffering service = getOwnedService(email, serviceId);
+        if (!service.isMain()) {
+            throw new BadRequestException("NOT_A_MAIN_SERVICE", "Only a main service can be shown on the card");
+        }
+        serviceOfferingRepository.findAllByBarberIdAndDeletedFalseOrderByName(service.getBarber().getId())
+                .forEach(other -> other.setFeatured(false));
+        serviceOfferingRepository.flush(); // one featured service per barber, also in the database
+        service.setFeatured(true);
     }
 
     @Transactional

@@ -94,12 +94,15 @@ class PackageTwoTest extends IntegrationTest {
     }
 
     @Test
-    void aBarberWhoApprovesByHandAnswersTheNewTimeAgain() throws Exception {
+    void aBarberWhoApprovesByHandAnswersTheNewTimeFirst() throws Exception {
         long id = idOf(book(customer, TUESDAY + "T10:00"));
         barber.setAutoConfirmBookings(false);
         barberRepository.save(barber);
 
-        reschedule(customer, id, TUESDAY + "T15:00").andExpect(jsonPath("$.status").value("PENDING"));
+        // See ChangeRequestTest: the confirmed time holds until the barber accepts the new one.
+        reschedule(customer, id, TUESDAY + "T15:00")
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.requestedStartTime").value("2030-01-08T15:00:00+02:00"));
     }
 
     // ---- blocks of hours ----

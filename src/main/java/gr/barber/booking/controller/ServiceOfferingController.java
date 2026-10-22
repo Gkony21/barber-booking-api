@@ -44,6 +44,13 @@ public class ServiceOfferingController {
         return serviceOfferingService.updateService(authentication.getName(), serviceId, request);
     }
 
+    // The main service shown with its price on the barber's card in the list.
+    @PostMapping("/me/services/{serviceId}/feature")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void featureService(@PathVariable Long serviceId, Authentication authentication) {
+        serviceOfferingService.featureService(authentication.getName(), serviceId);
+    }
+
     // Hides the service from customers; saving it again (PUT) shows it again.
     @PostMapping("/me/services/{serviceId}/hide")
     @ResponseStatus(HttpStatus.NO_CONTENT)

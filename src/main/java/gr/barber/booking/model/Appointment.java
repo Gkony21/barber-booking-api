@@ -72,6 +72,12 @@ public class Appointment {
 
     private Instant requestReminderSentAt;
 
+    // Set on a request to move a confirmed appointment: this pending row holds the new time, while
+    // the confirmed one keeps its own until the barber answers.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "replaces_id")
+    private Appointment replaces;
+
     protected Appointment() {
     }
 
@@ -97,6 +103,17 @@ public class Appointment {
         return appointment;
     }
 
+    /** A request to move a confirmed appointment to a new time, with the same services and price. */
+    public static Appointment changeOf(Appointment original, Instant startAt, Instant endAt) {
+        Appointment change = new Appointment(original.customer, original.barber, original.service,
+                startAt, endAt, AppointmentStatus.PENDING, original.customerNote);
+        change.serviceName = original.serviceName;
+        change.price = original.price;
+        original.extras.forEach(extra -> change.extras.add(new AppointmentExtra(change, extra)));
+        change.replaces = original;
+        return change;
+    }
+
     /** Adds the extras (in order) and their prices to the total. */
     public void addExtras(List<ServiceOffering> chosen) {
         for (ServiceOffering extra : chosen) {
@@ -107,6 +124,15 @@ public class Appointment {
 
     public List<AppointmentExtra> getExtras() {
         return extras;
+    }
+
+    public boolean isChange() {
+        return replaces != null;
+    }
+
+    /** For a change: the confirmed appointment it would move. */
+    public Appointment getReplaces() {
+        return replaces;
     }
 
     public boolean isManual() {

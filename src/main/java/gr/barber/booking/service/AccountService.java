@@ -75,6 +75,9 @@ public class AccountService {
         }
 
         for (Appointment appointment : appointmentRepository.findUpcomingActiveInvolving(user.getId(), clock.instant())) {
+            if (appointment.isChange()) {
+                continue; // goes with the appointment it would move
+            }
             boolean asCustomer = appointment.getCustomer() != null
                     && Objects.equals(appointment.getCustomer().getId(), user.getId());
             appointment.cancel(asCustomer ? CancelledBy.CUSTOMER : CancelledBy.BARBER);

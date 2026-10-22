@@ -6,7 +6,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.ResultActions;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -18,6 +21,12 @@ class RegistrationFlowTest extends IntegrationTest {
 
     @Autowired
     private ApplicationEvents events;
+
+    @Autowired
+    private UnverifiedAccountCleanup cleanup;
+
+    @Autowired
+    private AuthService authService;
 
     @Test
     void newAccountMustVerifyEmailBeforeLoggingIn() throws Exception {
@@ -37,6 +46,39 @@ class RegistrationFlowTest extends IntegrationTest {
         login("MARIA@test.gr", "pass1234")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty());
+    }
+
+    @Test
+    void accountsNeverVerifiedAreRemovedAfterTwoDays() throws Exception {
+        register("maria@test.gr", "CUSTOMER");
+        register("eleni@test.gr", "CUSTOMER");
+        verify(events.stream(VerificationEmailRequested.class).skip(1).findFirst().orElseThrow().token());
+
+        clock.advance(Duration.ofHours(47));
+        assertThat(cleanup.process()).isZero();
+        clock.advance(Duration.ofHours(2));
+        assertThat(cleanup.process()).isEqualTo(1);
+
+        assertThat(userRepository.findByEmail("maria@test.gr")).isEmpty();
+        assertThat(userRepository.findByEmail("eleni@test.gr")).isPresent();
+        register("maria@test.gr", "CUSTOMER").andExpect(status().isOk()); // the address is free again
+    }
+
+    @Test
+    void signUpsArePausedAfterTheDailyLimit() throws Exception {
+        ReflectionTestUtils.setField(authService, "dailySignUps", 2);
+        try {
+            register("a@test.gr", "CUSTOMER").andExpect(status().isOk());
+            register("b@test.gr", "BARBER").andExpect(status().isOk());
+            register("c@test.gr", "CUSTOMER")
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.code").value("SIGN_UPS_PAUSED"));
+
+            clock.advance(Duration.ofHours(25));
+            register("c@test.gr", "CUSTOMER").andExpect(status().isOk());
+        } finally {
+            ReflectionTestUtils.setField(authService, "dailySignUps", 100_000);
+        }
     }
 
     @Test

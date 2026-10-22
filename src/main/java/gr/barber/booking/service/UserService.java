@@ -15,6 +15,8 @@ import gr.barber.booking.dto.UpdateMeRequestDTO;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Clock;
+
 @Service
 
 public class UserService {
@@ -22,14 +24,17 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final PasswordPolicy passwordPolicy;
+    private final Clock clock;
 
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       PasswordPolicy passwordPolicy) {
+                       PasswordPolicy passwordPolicy,
+                       Clock clock) {
 
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicy = passwordPolicy;
+        this.clock = clock;
     }
 
     // Accounts created by an admin are trusted; self-registered ones must verify their email.
@@ -49,6 +54,7 @@ public class UserService {
                 request.getRole()
         );
         user.setEmailVerified(emailVerified);
+        user.setCreatedAt(clock.instant());
 
         User savedUser = userRepository.save(user);
 
