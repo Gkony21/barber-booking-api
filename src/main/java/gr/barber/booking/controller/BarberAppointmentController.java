@@ -2,6 +2,7 @@ package gr.barber.booking.controller;
 
 import gr.barber.booking.dto.AppointmentResponseDTO;
 import gr.barber.booking.dto.AvailabilityResponseDTO;
+import gr.barber.booking.dto.BarberAppointmentUpdateDTO;
 import gr.barber.booking.dto.DayStatusDTO;
 import gr.barber.booking.dto.ManualAppointmentRequestDTO;
 import gr.barber.booking.dto.TimeOffRequestDTO;
@@ -52,12 +53,14 @@ public class BarberAppointmentController {
         return appointmentService.getDays(barberId, serviceId, extraIds, minutes, from, to);
     }
 
-    // The barber's own free times within working hours, for entering a booking by hand.
+    // The barber's own free times within working hours, for entering a booking by hand; "except" is
+    // an appointment being moved, whose own time counts as free.
     @GetMapping("/me/availability")
     public AvailabilityResponseDTO getMyAvailability(@RequestParam int minutes,
                                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                                     @RequestParam(required = false) Long except,
                                                      Authentication authentication) {
-        return appointmentService.getOwnAvailability(authentication.getName(), minutes, date);
+        return appointmentService.getOwnAvailability(authentication.getName(), minutes, date, except);
     }
 
     @GetMapping("/me/appointments")
@@ -73,6 +76,14 @@ public class BarberAppointmentController {
     public AppointmentResponseDTO bookManually(@Valid @RequestBody ManualAppointmentRequestDTO request,
                                                Authentication authentication) {
         return appointmentService.bookManually(authentication.getName(), request);
+    }
+
+    // Moves a confirmed appointment or changes its services.
+    @PutMapping("/me/appointments/{id}")
+    public AppointmentResponseDTO update(@PathVariable Long id,
+                                         @Valid @RequestBody BarberAppointmentUpdateDTO request,
+                                         Authentication authentication) {
+        return appointmentService.updateByBarber(authentication.getName(), id, request);
     }
 
     @PostMapping("/me/appointments/{id}/confirm")

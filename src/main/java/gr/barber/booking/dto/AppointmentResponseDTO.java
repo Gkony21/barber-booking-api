@@ -38,7 +38,8 @@ public record AppointmentResponseDTO(
         OffsetDateTime originalStartTime
 ) {
 
-    public record Extra(String name, BigDecimal price, int durationMinutes) {
+    // serviceId: the extra as it is offered now, e.g. to pick it again when the barber changes the appointment.
+    public record Extra(Long serviceId, String name, BigDecimal price, int durationMinutes) {
     }
 
     public static AppointmentResponseDTO from(Appointment appointment, ZoneId zone) {
@@ -56,7 +57,7 @@ public record AppointmentResponseDTO(
                 appointment.getService().getId(),
                 appointment.getServiceName(),
                 appointment.getExtras().stream()
-                        .map(extra -> new Extra(extra.getName(), extra.getPrice(), extra.getDurationMinutes()))
+                        .map(extra -> new Extra(extra.getServiceId(), extra.getName(), extra.getPrice(), extra.getDurationMinutes()))
                         .toList(),
                 Duration.between(appointment.getStartAt(), appointment.getEndAt()).toMinutes(),
                 appointment.getPrice(),

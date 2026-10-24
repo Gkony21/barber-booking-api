@@ -5,6 +5,7 @@ import gr.barber.booking.dto.AppointmentRequestDTO;
 import gr.barber.booking.dto.AppointmentResponseDTO;
 import gr.barber.booking.dto.ManualAppointmentRequestDTO;
 import gr.barber.booking.dto.AvailabilityResponseDTO;
+import gr.barber.booking.dto.BarberAppointmentUpdateDTO;
 import gr.barber.booking.dto.DayStatusDTO;
 import gr.barber.booking.exception.BadRequestException;
 import gr.barber.booking.exception.ConflictException;
@@ -116,11 +117,16 @@ public class AppointmentService {
                 .toList();
     }
 
-    /** The barber's own free quarter hours within working hours, for entering a phone or walk-in booking. */
+    /**
+     * The barber's own free quarter hours within working hours, for entering a phone or walk-in booking.
+     * With {@code exceptId}, that appointment of theirs counts as free, as when moving it.
+     */
     @Transactional(readOnly = true)
-    public AvailabilityResponseDTO getOwnAvailability(String barberEmail, int minutes, LocalDate date) {
+    public AvailabilityResponseDTO getOwnAvailability(String barberEmail, int minutes, LocalDate date, Long exceptId) {
         Barber barber = barberService.getByEmail(barberEmail);
-        List<String> startTimes = availabilityService.freeStartsForBarber(barber, date, checkedLength(minutes)).stream()
+        List<Long> ignoring = exceptId == null ? List.of() : appointmentRepository.findByIdAndBarberId(exceptId, barber.getId())
+                .map(Appointment::getId).map(List::of).orElse(List.of());
+        List<String> startTimes = availabilityService.freeStartsForBarber(barber, date, checkedLength(minutes), ignoring).stream()
                 .map(TIME_FORMAT::format)
                 .toList();
         return new AvailabilityResponseDTO(barber.getId(), null, date, minutes, startTimes);
@@ -259,6 +265,70 @@ public class AppointmentService {
             throw new ConflictException("OVERLAPS_APPOINTMENT", "This time overlaps another appointment");
         }
         return AppointmentResponseDTO.from(appointment, zone);
+    }
+
+    /**
+     * The barber moves a confirmed appointment or changes its services, e.g. after a phone call. As when
+     * entering one by hand, working hours are the barber's call and only overlaps are refused. An app
+     * customer hears about it by email; the details of someone without an account can be edited too.
+     */
+    @Transactional
+    public AppointmentResponseDTO updateByBarber(String barberEmail, Long appointmentId, BarberAppointmentUpdateDTO request) {
+
+        Appointment appointment = getBarberAppointment(barberEmail, appointmentId);
+        if (appointment.getStatus() != AppointmentStatus.CONFIRMED || appointment.isChange()) {
+            throw new BadRequestException("APPOINTMENT_NOT_EDITABLE", "Only confirmed appointments can be changed");
+        }
+        if (appointmentRepository.findByReplacesId(appointment.getId()).isPresent()) {
+            throw new BadRequestException("CHANGE_PENDING", "Answer the customer's change of time first");
+        }
+        if (appointment.isManual() && (request.customerName() == null || request.customerName().isBlank())) {
+            throw new BadRequestException("VALIDATION_FAILED", "Enter the customer's name");
+        }
+
+        Barber barber = appointment.getBarber();
+        Selection selection = select(barber, request.serviceId(), request.extraIds());
+        ZoneId zone = zone();
+        Instant startAt = request.startTime().atZone(zone).toInstant();
+        Instant endAt = startAt.plusSeconds(selection.durationMinutes() * 60L);
+        Instant now = clock.instant();
+
+        if (startAt.isBefore(now.minus(Duration.ofMinutes(30)))) {
+            throw new BadRequestException("APPOINTMENT_IN_PAST", "The appointment must not be in the past");
+        }
+        if (startAt.isAfter(now.plus(MANUAL_BOOKING_WINDOW))) {
+            throw new BadRequestException("TOO_FAR_AHEAD", "Appointments can be entered up to 90 days ahead");
+        }
+        boolean overlaps = appointmentRepository.findActiveForBarberOverlapping(barber.getId(), startAt, endAt).stream()
+                .anyMatch(other -> !other.getId().equals(appointment.getId()));
+        if (overlaps) {
+            throw new ConflictException("OVERLAPS_APPOINTMENT", "This time overlaps another appointment");
+        }
+
+        Instant previousStart = appointment.getStartAt();
+        String before = summary(appointment);
+        appointment.changeByBarber(startAt, endAt, selection.main(), selection.extras());
+        if (appointment.isManual()) {
+            appointment.changeGuest(request.customerName().strip(), blankToNull(request.customerPhone()), blankToNull(request.note()));
+        }
+        try {
+            appointmentRepository.saveAndFlush(appointment);
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException("OVERLAPS_APPOINTMENT", "This time overlaps another appointment");
+        }
+
+        boolean moved = !startAt.equals(previousStart);
+        if (!appointment.isManual() && (moved || !before.equals(summary(appointment)))) {
+            eventPublisher.publishEvent(AppointmentEvent.of(AppointmentEventType.CHANGED_BY_BARBER, appointment, zone,
+                    moved ? previousStart : null));
+        }
+        return AppointmentResponseDTO.from(appointment, zone);
+    }
+
+    // What the customer would notice changing: services, length and price.
+    private static String summary(Appointment appointment) {
+        return appointment.getServiceName() + "|" + appointment.getExtras().stream().map(e -> e.getName()).toList()
+                + "|" + appointment.getEndAt().getEpochSecond() + "|" + appointment.getPrice().stripTrailingZeros();
     }
 
     private static String blankToNull(String value) {

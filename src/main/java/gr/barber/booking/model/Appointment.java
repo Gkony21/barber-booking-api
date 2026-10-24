@@ -173,6 +173,31 @@ public class Appointment {
         this.requestReminderSentAt = null;
     }
 
+    /**
+     * The barber's change: new start and end (reminders start over only if the time moved) and the
+     * services, whose names and prices are copied again as they are now.
+     */
+    public void changeByBarber(Instant newStart, Instant newEnd, ServiceOffering main, List<ServiceOffering> chosenExtras) {
+        if (!newStart.equals(startAt)) {
+            this.reminderDaySentAt = null;
+            this.reminderSoonSentAt = null;
+        }
+        this.startAt = newStart;
+        this.endAt = newEnd;
+        this.service = main;
+        this.serviceName = main.getName();
+        this.price = main.getPrice();
+        this.extras.clear();
+        addExtras(chosenExtras);
+    }
+
+    /** For an appointment the barber entered: who it is for and the barber's note. */
+    public void changeGuest(String name, String phone, String note) {
+        this.guestName = name;
+        this.guestPhone = phone;
+        this.customerNote = note;
+    }
+
     /** A request nobody answered in time. */
     public void expire() {
         this.status = AppointmentStatus.EXPIRED;
