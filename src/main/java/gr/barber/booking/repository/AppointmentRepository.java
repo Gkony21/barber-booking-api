@@ -99,6 +99,10 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     Optional<Appointment> findByReplacesId(Long originalId);
 
+    // Every appointment of a barber with its customer loaded, for the barber's list of customers.
+    @Query("select a from Appointment a left join fetch a.customer where a.barber.id = :barberId order by a.startAt desc")
+    List<Appointment> findAllForBarberNewestFirst(Long barberId);
+
     List<Appointment> findAllByReplacesIdIn(Collection<Long> originalIds);
 
     @Query("""

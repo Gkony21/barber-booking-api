@@ -35,7 +35,9 @@ public record AppointmentResponseDTO(
         // A confirmed appointment the customer asked to move: the time asked for, until the barber answers.
         OffsetDateTime requestedStartTime,
         // On that request itself (barber's schedule): the confirmed time it would replace.
-        OffsetDateTime originalStartTime
+        OffsetDateTime originalStartTime,
+        // For the barber: who this is in their list of customers (see ClientKeys); null elsewhere.
+        String clientKey
 ) {
 
     // serviceId: the extra as it is offered now, e.g. to pick it again when the barber changes the appointment.
@@ -47,6 +49,11 @@ public record AppointmentResponseDTO(
     }
 
     public static AppointmentResponseDTO from(Appointment appointment, ZoneId zone, int customerNoShows, Appointment change) {
+        return from(appointment, zone, customerNoShows, change, null);
+    }
+
+    public static AppointmentResponseDTO from(Appointment appointment, ZoneId zone, int customerNoShows, Appointment change,
+                                              String clientKey) {
         return new AppointmentResponseDTO(
                 appointment.getId(),
                 appointment.getBarber().getId(),
@@ -69,7 +76,8 @@ public record AppointmentResponseDTO(
                 appointment.getCustomerNote(),
                 customerNoShows,
                 change != null ? change.getStartAt().atZone(zone).toOffsetDateTime() : null,
-                appointment.isChange() ? appointment.getReplaces().getStartAt().atZone(zone).toOffsetDateTime() : null
+                appointment.isChange() ? appointment.getReplaces().getStartAt().atZone(zone).toOffsetDateTime() : null,
+                clientKey
         );
     }
 }

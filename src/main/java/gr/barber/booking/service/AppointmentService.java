@@ -502,7 +502,7 @@ public class AppointmentService {
         return appointments.stream()
                 .map(a -> AppointmentResponseDTO.from(a, zone,
                         a.getCustomer() == null ? 0 : noShows.getOrDefault(a.getCustomer().getId(), 0L).intValue(),
-                        changes.get(a.getId())))
+                        changes.get(a.getId()), ClientKeys.of(a)))
                 .toList();
     }
 
