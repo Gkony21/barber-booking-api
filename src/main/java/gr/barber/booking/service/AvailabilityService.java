@@ -160,9 +160,9 @@ public class AvailabilityService {
      * outside working hours stay possible from the app, by choice.
      */
     @Transactional(readOnly = true)
-    public List<LocalTime> freeStartsForBarber(Barber barber, LocalDate date, int durationMinutes) {
+    public List<LocalTime> freeStartsForBarber(Barber barber, LocalDate date, int durationMinutes, Collection<Long> ignoring) {
         Schedule schedule = load(List.of(barber.getId()), date, date).getOrDefault(barber.getId(), Schedule.EMPTY);
-        return startTimes(date, durationMinutes, schedule, 15, clock.instant(), Duration.ZERO);
+        return startTimes(date, durationMinutes, schedule.without(ignoring), 15, clock.instant(), Duration.ZERO);
     }
 
     /**

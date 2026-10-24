@@ -85,6 +85,9 @@ public class AppointmentEmailListener {
             case CHANGE_DECLINED -> toCustomer(event, "Η αλλαγή ώρας δεν έγινε δεκτή",
                     "Η νέα ώρα δεν είναι διαθέσιμη, οπότε το ραντεβού σου μένει στην αρχική ώρα. "
                             + "Μπορείς να ζητήσεις άλλη ώρα από την εφαρμογή.\n\n" + details);
+            case CHANGED_BY_BARBER -> toCustomer(event, "Το ραντεβού σου άλλαξε",
+                    "Το κατάστημα έκανε αλλαγή στο ραντεβού σου. Αν δεν σε βολεύει, μπορείς να ζητήσεις άλλη ώρα "
+                            + "ή να το ακυρώσεις από την εφαρμογή.\n\n" + details);
             case CHANGE_WITHDRAWN -> toBarber(event, "Η αλλαγή ώρας ακυρώθηκε",
                     "Το αίτημα αλλαγής ώρας ακυρώθηκε. Το ραντεβού μένει στην αρχική ώρα.\n\n" + details);
             case REQUEST_WAITING -> {

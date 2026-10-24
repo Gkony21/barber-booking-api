@@ -13,6 +13,8 @@ public enum AppointmentEventType {
     CHANGE_ACCEPTED,
     CHANGE_DECLINED,
     CHANGE_WITHDRAWN,
+    // The barber moved a confirmed appointment or changed its services.
+    CHANGED_BY_BARBER,
     REQUEST_WAITING,
     REQUEST_EXPIRED,
     REMINDER_DAY,

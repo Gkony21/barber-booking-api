@@ -4,6 +4,7 @@ import gr.barber.booking.model.Appointment;
 import gr.barber.booking.model.AppointmentStatus;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -25,11 +26,16 @@ public record AppointmentEvent(
         ZonedDateTime startTime,
         // Waiting for the barber's answer.
         boolean pending,
-        // For a change of time: the confirmed time it would replace (startTime is the new one).
+        // For a change of time (asked by the customer or made by the barber): the time it had
+        // before; startTime is the new one.
         ZonedDateTime originalStartTime
 ) {
 
     public static AppointmentEvent of(AppointmentEventType type, Appointment appointment, ZoneId zone) {
+        return of(type, appointment, zone, appointment.isChange() ? appointment.getReplaces().getStartAt() : null);
+    }
+
+    public static AppointmentEvent of(AppointmentEventType type, Appointment appointment, ZoneId zone, Instant previousStart) {
         return new AppointmentEvent(
                 type,
                 appointment.getCustomer() != null ? appointment.getCustomer().getEmail() : null,
@@ -42,7 +48,7 @@ public record AppointmentEvent(
                 appointment.getPrice(),
                 appointment.getStartAt().atZone(zone),
                 appointment.getStatus() == AppointmentStatus.PENDING,
-                appointment.isChange() ? appointment.getReplaces().getStartAt().atZone(zone) : null
+                previousStart != null ? previousStart.atZone(zone) : null
         );
     }
 }

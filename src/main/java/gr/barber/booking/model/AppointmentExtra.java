@@ -55,6 +55,10 @@ public class AppointmentExtra {
         this.position = copy.position;
     }
 
+    public Long getServiceId() {
+        return service.getId();
+    }
+
     public String getName() {
         return name;
     }
