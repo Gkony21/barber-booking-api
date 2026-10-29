@@ -53,3 +53,10 @@ services:
         value: "false"
       - key: FORWARD_HEADERS_STRATEGY
         value: framework
+      # Phone notifications: the key pair from .local-backup/vapid-keys.txt (never committed).
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: https://fade-app-7ro.pages.dev
