@@ -1,0 +1,83 @@
+# Proves the latest backup can be restored: downloads it from R2, decrypts it and loads it into a
+# throwaway database that exists only inside this job. Production is only read, to compare the table list.
+# This repository is public, so the log shows table names and pass/fail only, never row counts or data.
+name: Backup restore test
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: postgres:17
+    services:
+      scratch:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: scratch # throwaway database, deleted when the job ends
+          POSTGRES_DB: restore_test
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      SCRATCH_URL: postgresql://postgres:scratch@scratch:5432/restore_test
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.BACKUP_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+    steps:
+      - name: Restore the latest backup and check it
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+
+          for variable in DATABASE_URL PASSPHRASE R2_ENDPOINT R2_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            [ -n "${!variable:-}" ] || fail "Backup secret for $variable is not set"
+          done
+
+          apt-get update -qq
+          apt-get install -qq -y gnupg awscli > /dev/null
+
+          latest=$(aws s3api list-objects-v2 --bucket "$R2_BUCKET" --prefix fade- --endpoint-url "$R2_ENDPOINT" \
+            --query 'sort_by(Contents, &LastModified)[-1].Key' --output text)
+          case "$latest" in
+            fade-*.sql.gz.gpg) ;;
+            *) fail "No backup found in the bucket" ;;
+          esac
+          echo "Testing $latest"
+          aws s3 cp "s3://$R2_BUCKET/$latest" "$latest" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+
+          gpg --quiet --batch --pinentry-mode loopback --passphrase-fd 3 --decrypt "$latest" 3<<<"$PASSPHRASE" \
+            | gunzip \
+            | psql -X -q -v ON_ERROR_STOP=1 "$SCRATCH_URL" > /dev/null
+
+          tables="select table_name from information_schema.tables
+                  where table_schema = 'public' and table_type = 'BASE TABLE' order by 1"
+          restored=$(psql -X -At "$SCRATCH_URL" -c "$tables")
+          production=$(PGOPTIONS="-c default_transaction_read_only=on" psql -X -At "$DATABASE_URL" -c "$tables")
+          [ "$restored" = "$production" ] || {
+            diff <(echo "$restored") <(echo "$production") || true
+            fail "Restored tables differ from production (expected if a migration ran after this backup)"
+          }
+
+          while read -r table; do
+            has_rows=$(psql -X -At "$SCRATCH_URL" -c "select exists (select 1 from \"$table\")")
+            if [ "$has_rows" = "t" ]; then echo "$table: has rows"; else echo "$table: empty"; fi
+            case "$table" in
+              users|flyway_schema_history) [ "$has_rows" = "t" ] || fail "$table should not be empty" ;;
+            esac
+          done <<< "$restored"
+
+          echo "Restore test passed for $latest"

@@ -1,12 +1,14 @@
-# Daily database backup: dumps the production database, encrypts it and stores it in Cloudflare R2.
-# Skipped until the repository secrets below are set. To restore: download the file, then
-#   gpg --decrypt fade-<date>.sql.gz.gpg | gunzip | psql "<database url>"
-# Keep about 30 days by adding a lifecycle rule on the bucket in Cloudflare.
+# Daily database backup: dumps the production database, encrypts it, checks it and stores it in Cloudflare R2.
+# The run fails (red) if a secret is missing or any step goes wrong, so green means a backup was stored.
+# To restore: download the file, then (with postgres 17 tools)
+#   gpg --decrypt fade-<date>.sql.gz.gpg | gunzip | psql -v ON_ERROR_STOP=1 "<database url>"
+# Retention (about 30 days) is a lifecycle rule on the bucket in Cloudflare.
+# "Backup restore test" (backup-restore-test.yml) proves the latest file really restores.
 name: Backup
 
 on:
   schedule:
-    - cron: "15 2 * * *" # every night, 04:15/05:15 in Athens
+    - cron: "15 2 * * *" # every night, 04:15/05:15 in Athens (GitHub may start it hours late)
   workflow_dispatch: {}
 
 permissions:
@@ -15,7 +17,8 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    container: postgres:17 # pg_dump must be as new as the database
+    timeout-minutes: 30
+    container: postgres:17 # the script below fails if this major version differs from the database
     env:
       DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
       PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
@@ -24,16 +27,57 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_R2_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
+      # R2 does not support every checksum that newer AWS CLI versions send by default.
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
     steps:
-      - name: Dump, encrypt and upload
+      - name: Dump, encrypt, check and upload
+        shell: bash
         run: |
-          if [ -z "$DATABASE_URL" ] || [ -z "$PASSPHRASE" ] || [ -z "$R2_BUCKET" ]; then
-            echo "Backup secrets are not set yet; skipping."
-            exit 0
-          fi
-          apt-get update -qq && apt-get install -qq -y gnupg awscli > /dev/null
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+
+          missing=""
+          for pair in BACKUP_DATABASE_URL=DATABASE_URL BACKUP_PASSPHRASE=PASSPHRASE R2_ENDPOINT=R2_ENDPOINT \
+                      BACKUP_BUCKET=R2_BUCKET BACKUP_R2_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID \
+                      BACKUP_R2_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY; do
+            variable="${pair#*=}"
+            if [ -z "${!variable:-}" ]; then missing="$missing ${pair%%=*}"; fi
+          done
+          [ -z "$missing" ] || fail "Missing backup secrets:$missing"
+
+          case "$DATABASE_URL" in
+            postgres://*|postgresql://*) ;;
+            *) fail "BACKUP_DATABASE_URL must start with postgresql:// (not jdbc:)" ;;
+          esac
+          case "$DATABASE_URL" in
+            *-pooler.*) fail "BACKUP_DATABASE_URL must be the direct Neon connection, not the -pooler one" ;;
+          esac
+
+          server_version=$(psql -X -At "$DATABASE_URL" -c "show server_version_num")
+          server_major=$((server_version / 10000))
+          client_major=$(pg_dump --version | awk '{print $3}' | cut -d. -f1)
+          [ "$server_major" = "$client_major" ] \
+            || fail "pg_dump is version $client_major but the database is version $server_major; update container in backup.yml"
+
+          apt-get update -qq
+          apt-get install -qq -y gnupg awscli > /dev/null
+
           file="fade-$(date -u +%Y-%m-%d).sql.gz.gpg"
           pg_dump --no-owner --no-privileges "$DATABASE_URL" | gzip \
-            | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$PASSPHRASE" -o "$file"
+            | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --symmetric --cipher-algo AES256 -o "$file" 3<<<"$PASSPHRASE"
+
+          # Open the encrypted file again: an empty or cut-off dump must never replace a good backup.
+          size=$(wc -c < "$file")
+          [ "$size" -ge 1024 ] || fail "Backup file is only $size bytes"
+          check=$(mktemp)
+          gpg --quiet --batch --pinentry-mode loopback --passphrase-fd 3 --decrypt "$file" 3<<<"$PASSPHRASE" | gunzip > "$check"
+          tail -n 10 "$check" | grep -q "PostgreSQL database dump complete" || fail "Dump is incomplete"
+          grep -q "^CREATE TABLE" "$check" || fail "Dump contains no tables"
+          rm -f "$check"
+
           aws s3 cp "$file" "s3://$R2_BUCKET/$file" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          stored_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$file" \
+            --endpoint-url "$R2_ENDPOINT" --query ContentLength --output text)
+          [ "$stored_size" = "$size" ] || fail "Uploaded file is $stored_size bytes, expected $size"
           echo "Stored $file ($(du -h "$file" | cut -f1))"
